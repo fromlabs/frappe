@@ -1,0 +1,36 @@
+name: flutter_petrol_pump
+description: A new Flutter project.
+version: 0.1.0
+
+environment:
+  sdk: '>=2.4.0 <3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^0.1.2
+
+  pedantic: ^1.0.0  
+  quiver: ^2.0.2
+  provider: ^3.0.0+1  
+  audioplayers: ^0.13.1
+
+  petrol_pump:
+    path: ../petrol_pump
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/logo.png
+    - assets/nozzle1.png
+    - assets/nozzle2.png
+    - assets/nozzle3.png
+    - assets/beep.wav
+    - assets/fast.wav
+    - assets/slow.wav
