@@ -180,6 +180,8 @@ void main() {
     void connectListeners() {
       listenCanceler = outputs.deliveryState
           .listen((e) => print('deliveryState: $e'))
+          .append(pumpLogicStateSink.state
+              .listen((e) => print('pumpLogicState: ${e.map((pump) => pump.runtimeType.toString()).orElse('none')}')))
           .append(outputs.saleCostLcdState
               .listen((e) => print('saleCostLcdState: $e')))
           .append(

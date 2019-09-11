@@ -189,6 +189,7 @@ class CombineBroadcastStream<T>
     _lastResult = _combineLastData<T>(_streams, _combiner);
 
     if (_collectFuture == null) {
+      // TODO verificare debounce
       _collectFuture = Future<void>.microtask(() {
         _add(_lastResult);
 
@@ -218,10 +219,12 @@ class MergeBroadcastStream<T> extends MultiBindableBroadcastStream<T, T> {
 
   @override
   void _onData(int index, data) {
+    // TODO verificare la politica di merge
     if (_collectFuture == null) {
       _lastResultIndex = index;
       _lastResult = data;
 
+      // TODO verificare debounce
       _collectFuture = Future<void>.microtask(() {
         _add(_lastResult);
 

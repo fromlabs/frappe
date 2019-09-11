@@ -6,6 +6,26 @@ import 'package:frappe/frappe.dart';
 import '../model.dart';
 import '../petrol_pump.dart';
 
+class PeriodicTimer {
+  final Duration period;
+
+  final EventStreamSink<Unit> _timerStreamSink = EventStreamSink();
+
+  StreamSubscription _timerSubscription;
+
+  PeriodicTimer(this.period) {
+    _timerSubscription =
+        Stream.periodic(period).listen((_) => _timerStreamSink.send(unit));
+  }
+
+  EventStream<Unit> get timerStream => _timerStreamSink.stream;
+
+  Future<void> dispose() async {
+    await _timerSubscription.cancel();
+    await _timerStreamSink.close();
+  }
+}
+
 class PumpEngineSimulatorImpl implements PumpEngineSimulator {
   Future<void> _stopFuture;
 
@@ -36,15 +56,13 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
     // connect to delivery state
     var subscription = _deliveryState.listen(null);
 
+    final tickerTimer = PeriodicTimer(Duration(milliseconds: 200));
+
     try {
       final disposePendingState =
           _disposeStreamSink.stream.mapTo(true).toState(false);
 
-      EventStream<Unit> tickStream = createEventStreamFromStream(
-              Stream.periodic(Duration(milliseconds: 200)).asBroadcastStream())
-          .mapTo(unit);
-
-      subscription = subscription.append(tickStream
+      subscription = subscription.append(tickerTimer.timerStream
           .gate(disposePendingState.map((pending) => !pending))
           .listen((_) {
         int pulses;
@@ -72,6 +90,7 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
       await _disposeStreamSink.stream.legacyStream.first;
     } finally {
       await subscription.cancel();
+      await tickerTimer.dispose();
     }
   }
 }

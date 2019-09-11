@@ -42,6 +42,8 @@ class EventStream<E> {
   ValueState<E> toState(E initValue) =>
       createValueStateFromStream<E>(initValue, _legacyStream);
 
+  EventStream<E> once() => EventStream._fromStream(_legacyStream.take(1));
+
   EventStream<E> distinct([Equalizer<E> distinctEquals]) =>
       EventStream._(DistinctBroadcastStream<E>(_legacyStream,
           distinctEquals: distinctEquals, keepLastData: false));
@@ -97,6 +99,22 @@ class EventStream<E> {
   }) =>
       ListenSubscription(
           _legacyStream.listen(onEvent, onError: onError, onDone: onDone));
+
+  ListenSubscription listenOnce(
+    OnDataHandler<E> onEvent, {
+    OnErrorHandler onError,
+    OnDoneHandler onDone,
+  }) {
+    ListenSubscription listenSubscription;
+
+    listenSubscription = listen((data) {
+      listenSubscription.cancel();
+
+      onEvent(data);
+    }, onError: onError, onDone: onDone);
+
+    return listenSubscription;
+  }
 
   static EventStream<E> merges<E>(Iterable<EventStream<E>> streams,
           [Merger<E> merger]) =>
