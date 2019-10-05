@@ -57,6 +57,35 @@ class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
   void sendOptionalOf(V value) => send(Optional<V>.of(value));
 }
 
+class ValueStateReference<V> {
+  ValueStateReference() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
+
+  // TODO implementare
+  ValueState<V> get state => throw UnimplementedError();
+
+  // TODO implementare
+  bool get isLinked => throw UnimplementedError();
+
+  // TODO implementare
+  void link(ValueState<V> state) => throw UnimplementedError();
+}
+
+class OptionalValueStateReference<V> extends ValueStateReference<Optional<V>> {
+  OptionalValueStateReference() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
+
+  @override
+  OptionalValueState<V> get state => super.state;
+
+  @override
+  void link(covariant OptionalValueState<V> state) => super.link(state);
+}
+
 class ValueState<V> {
   final EventStream<V> _stream;
 

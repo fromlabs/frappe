@@ -3,8 +3,6 @@ import 'package:optional/optional.dart';
 import 'listen_subscription.dart';
 import 'typedef.dart';
 import 'value_state.dart';
-import 'event_stream_reference.dart';
-import 'value_state_reference.dart';
 
 class EventStreamSink<E> {
   final Merger<E> merger;
@@ -36,6 +34,36 @@ class OptionalEventStreamSink<E> extends EventStreamSink<Optional<E>> {
   void sendOptionalEmpty() => send(Optional<E>.empty());
 
   void sendOptionalOf(E event) => send(Optional<E>.of(event));
+}
+
+class EventStreamReference<E> {
+  EventStreamReference() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
+
+  // TODO implementare
+  EventStream<E> get stream => throw UnimplementedError();
+
+  // TODO implementare
+  bool get isLinked => throw UnimplementedError();
+
+  // TODO implementare
+  void link(EventStream<E> stream) => throw UnimplementedError();
+}
+
+class OptionalEventStreamReference<E>
+    extends EventStreamReference<Optional<E>> {
+  OptionalEventStreamReference() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
+
+  @override
+  OptionalEventStream<E> get stream => super.stream;
+
+  @override
+  void link(covariant OptionalEventStream<E> stream) => super.link(stream);
 }
 
 class EventStream<E> {
