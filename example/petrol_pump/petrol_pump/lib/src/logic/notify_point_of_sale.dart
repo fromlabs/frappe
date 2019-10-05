@@ -18,7 +18,7 @@ class NotifyPointOfSale {
     @required Fill fill,
     @required EventStream<Unit> clearSaleStream,
   }) {
-    final phaseStateRef = ValueStateReference(_Phase.idle);
+    final phaseStateRef = ValueStateReference();
 
     final startStream = lifecycle.startStream
         .gate(phaseStateRef.state.map((phase) => phase == _Phase.idle));
@@ -30,7 +30,7 @@ class NotifyPointOfSale {
     phaseStateRef.link(startStream.mapTo(_Phase.filling).orElses([
       endStream.mapTo(_Phase.pos),
       clearSaleStream.mapTo(_Phase.idle)
-    ]).toState(phaseStateRef.state.current));
+    ]).toState(_Phase.idle));
 
     final fuelFlowingState = startStream
         .mapToOptionalOf()

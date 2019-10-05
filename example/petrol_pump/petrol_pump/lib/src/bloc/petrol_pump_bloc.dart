@@ -90,7 +90,7 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
     _nozzleStates = BuiltList.of(range(1, 4).map((number) {
       final initialState = UpDown.down;
 
-      final nozzleStateRef = ValueStateReference(initialState);
+      final nozzleStateRef = ValueStateReference();
 
       nozzleStateRef.link(_toggleNozzleStreamSink.stream
           .where((nozzle) => nozzle == number)

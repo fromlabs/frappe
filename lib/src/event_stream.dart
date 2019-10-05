@@ -1,55 +1,71 @@
-import 'dart:async';
-
 import 'package:optional/optional.dart';
 
-import 'broadcast_stream.dart';
 import 'listen_subscription.dart';
 import 'typedef.dart';
 import 'value_state.dart';
 import 'event_stream_reference.dart';
 import 'value_state_reference.dart';
 
-EventStream<E> createEventStreamFromBroadcastStream<E>(
-        BroadcastStream<E> broadcastStream) =>
-    EventStream._(broadcastStream);
+class EventStreamSink<E> {
+  final Merger<E> merger;
 
-OptionalEventStream<E> createOptionalEventStreamFromBroadcastStream<E>(
-        BroadcastStream<Optional<E>> broadcastStream) =>
-    OptionalEventStream._(broadcastStream);
+  final EventStream<E> stream;
 
-OptionalEventStream<E> createOptionalEventStreamFromStream<E>(
-        Stream<Optional<E>> stream) =>
-    OptionalEventStream._fromStream(stream);
+  // TODO implementare
+  EventStreamSink([this.merger]) : stream = throw UnimplementedError();
 
-EventStream<E> createEventStreamFromStream<E>(Stream<E> stream) =>
-    EventStream._fromStream(stream);
+  // TODO implementare
+  bool get isClosed => throw UnimplementedError();
+
+  // TODO implementare
+  Future<void> close() => throw UnimplementedError();
+
+  // TODO implementare
+  void send(E event) => throw UnimplementedError();
+}
+
+class OptionalEventStreamSink<E> extends EventStreamSink<Optional<E>> {
+  OptionalEventStreamSink([Merger<Optional<E>> merger]) : super(merger) {
+    // TODO implementare
+    throw UnimplementedError();
+  }
+
+  @override
+  OptionalEventStream<E> get stream => super.stream;
+
+  void sendOptionalEmpty() => send(Optional<E>.empty());
+
+  void sendOptionalOf(E event) => send(Optional<E>.of(event));
+}
 
 class EventStream<E> {
-  final BroadcastStream<E> _legacyStream;
+  EventStream.never() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
 
-  EventStream.never() : this._(NeverBroadcastStream<E>());
+  // TODO implementare
+  OptionalEventStream<EE> asOptional<EE>() => throw UnimplementedError();
 
-  EventStream._fromStream(Stream<E> stream)
-      : this._(FromBroadcastStream<E>(stream, keepLastData: false));
+  // TODO implementare
+  ValueState<E> toState(E initValue) => throw UnimplementedError();
 
-  EventStream._(this._legacyStream);
+  // TODO implementare
+  ValueState<E> toStateLazy(Lazy<E> lazyInitValue) =>
+      throw UnimplementedError();
 
-  Stream<E> get legacyStream => _legacyStream;
+  // TODO implementare
+  Stream<E> toLegacyStream() => throw UnimplementedError();
 
-  OptionalEventStream<EE> asOptional<EE>() =>
-      OptionalEventStream._(_legacyStream as BroadcastStream<Optional<EE>>);
+  // TODO implementare
+  EventStream<E> once() => throw UnimplementedError();
 
-  ValueState<E> toState(E initValue) =>
-      createValueStateFromStream<E>(initValue, _legacyStream);
-
-  EventStream<E> once() => EventStream._fromStream(_legacyStream.take(1));
-
+  // TODO implementare
   EventStream<E> distinct([Equalizer<E> distinctEquals]) =>
-      EventStream._(DistinctBroadcastStream<E>(_legacyStream,
-          distinctEquals: distinctEquals, keepLastData: false));
+      throw UnimplementedError();
 
-  EventStream<ER> map<ER>(Mapper<E, ER> mapper) =>
-      EventStream._fromStream(_legacyStream.map(mapper));
+  // TODO implementare
+  EventStream<ER> map<ER>(Mapper<E, ER> mapper) => throw UnimplementedError();
 
   EventStream<ER> mapTo<ER>(ER event) => map<ER>((_) => event);
 
@@ -59,22 +75,38 @@ class EventStream<E> {
   OptionalEventStream<E> mapToOptionalOf() =>
       map<Optional<E>>((event) => Optional<E>.of(event)).asOptional<E>();
 
-  EventStream<E> where(Filter<E> filter) =>
-      EventStream._fromStream(_legacyStream.where(filter));
+  // TODO implementare
+  EventStream<E> where(Filter<E> filter) => throw UnimplementedError();
 
+  // TODO implementare
   ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) {
-    final reference = ValueStateReference<V>(initValue);
+    // TODO in transazione implicita
+    final reference = ValueStateReference<V>();
     reference.link(snapshot(reference.state, accumulator).toState(initValue));
     return reference.state;
   }
 
+  // TODO implementare
+  ValueState<V> accumulateLazy<V>(
+          Lazy<V> lazyInitValue, Accumulator<E, V> accumulator) =>
+      throw UnimplementedError();
+
+  // TODO implementare
   EventStream<ER> collect<ER, V>(V initValue, Collector<E, V, ER> collector) {
+    // TODO in transazione implicita
     final reference = EventStreamReference<V>();
     final stream = snapshot(reference.stream.toState(initValue), collector);
     reference.link(stream.map((tuple) => tuple.item2));
     return stream.map((tuple) => tuple.item1);
   }
 
+  // TODO implementare
+  EventStream<ER> collectLazy<ER, V>(
+          Lazy<V> lazyInitValue, Collector<E, V, ER> collector) =>
+      throw UnimplementedError();
+
+  // TODO implementare
+  // TODO in transazione implicita
   EventStream<E> gate(ValueState<bool> conditionState) => snapshot(
           conditionState,
           (event, condition) =>
@@ -87,51 +119,35 @@ class EventStream<E> {
   EventStream<E> orElses(Iterable<EventStream<E>> streams) =>
       merges<E>([this, ...streams]);
 
+  // TODO implementare
   EventStream<ER> snapshot<V2, ER>(
           ValueState<V2> fromState, Combiner2<E, V2, ER> combiner) =>
-      EventStream._(SnapshotBroadcastStream<E, V2, ER>(
-          _legacyStream, fromState.legacyStream, combiner));
+      throw UnimplementedError();
 
-  ListenSubscription listen(
-    OnDataHandler<E> onEvent, {
-    OnErrorHandler onError,
-    OnDoneHandler onDone,
-  }) =>
-      ListenSubscription(
-          _legacyStream.listen(onEvent, onError: onError, onDone: onDone));
+  // TODO implementare
+  ListenSubscription listen(OnDataHandler<E> onEvent) =>
+      throw UnimplementedError();
 
-  ListenSubscription listenOnce(
-    OnDataHandler<E> onEvent, {
-    OnErrorHandler onError,
-    OnDoneHandler onDone,
-  }) {
+  ListenSubscription listenOnce(OnDataHandler<E> onEvent) {
     ListenSubscription listenSubscription;
 
     listenSubscription = listen((data) {
       listenSubscription.cancel();
 
       onEvent(data);
-    }, onError: onError, onDone: onDone);
+    });
 
     return listenSubscription;
   }
 
+  // TODO implementare
   static EventStream<E> merges<E>(Iterable<EventStream<E>> streams,
           [Merger<E> merger]) =>
-      EventStream._(MergeBroadcastStream<E>(
-          streams.map((stream) => stream._legacyStream), merger));
+      throw UnimplementedError();
 }
 
 class OptionalEventStream<E> extends EventStream<Optional<E>> {
   OptionalEventStream.never() : super.never();
-
-  OptionalEventStream._fromStream(Stream<Optional<E>> stream)
-      : super._fromStream(stream);
-
-  OptionalEventStream._(BroadcastStream<Optional<E>> stream) : super._(stream);
-
-  @override
-  Stream<Optional<E>> get legacyStream => _legacyStream;
 
   @override
   OptionalValueState<E> toState(Optional<E> initValue) =>
@@ -141,6 +157,7 @@ class OptionalEventStream<E> extends EventStream<Optional<E>> {
 
   EventStream<bool> mapIsPresentOptional() => map((event) => event.isPresent);
 
+  // TODO in transazione unica
   EventStream<E> mapWhereOptional() =>
       where((event) => event.isPresent).map((event) => event.value);
 }

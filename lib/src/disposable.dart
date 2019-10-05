@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'value_state_sink.dart';
-import 'event_stream_sink.dart';
+import 'value_state.dart';
+import 'event_stream.dart';
 import 'listen_subscription.dart';
 
 abstract class Disposable {

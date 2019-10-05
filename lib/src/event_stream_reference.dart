@@ -1,30 +1,29 @@
 import 'package:optional/optional.dart';
 
-import 'broadcast_stream.dart';
 import 'event_stream.dart';
 
 class EventStreamReference<E> {
-  final EventStream<E> stream;
+  EventStreamReference() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
 
-  EventStreamReference()
-      : this._(createEventStreamFromBroadcastStream<E>(
-            ReferenceBroadcastStream<E>(keepLastData: false)));
+  // TODO implementare
+  EventStream<E> get stream => throw UnimplementedError();
 
-  EventStreamReference._(this.stream);
+  // TODO implementare
+  bool get isLinked => throw UnimplementedError();
 
-  bool get isLinked => _referenceStream.isLinked;
-
-  void link(EventStream<E> stream) =>
-      _referenceStream.link(stream.legacyStream);
-
-  ReferenceBroadcastStream<E> get _referenceStream => stream.legacyStream;
+  // TODO implementare
+  void link(EventStream<E> stream) => throw UnimplementedError();
 }
 
 class OptionalEventStreamReference<E>
     extends EventStreamReference<Optional<E>> {
-  OptionalEventStreamReference()
-      : super._(createOptionalEventStreamFromBroadcastStream<E>(
-            ReferenceBroadcastStream<Optional<E>>(keepLastData: false)));
+  OptionalEventStreamReference() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
 
   @override
   OptionalEventStream<E> get stream => super.stream;

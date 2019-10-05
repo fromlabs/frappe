@@ -36,7 +36,7 @@ class PresetAmountPump extends BasePump {
 
     startStreamRef.link(notifyPointOfSale.startStream);
 
-    final isKeypadActiveStateRef = ValueStateReference(true);
+    final isKeypadActiveStateRef = ValueStateReference();
 
     final keypad = Keypad(
       keypadStream: inputs.keypadStream,

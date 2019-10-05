@@ -5,13 +5,13 @@ ValueState<double> accumulate(
   EventStream<int> deltaStream,
   ValueState<double> calibrationState,
 ) {
-  final totalStateRef = ValueStateReference(0);
+  final totalStateRef = ValueStateReference();
 
   totalStateRef.link(clearAccumulatorStream
       .mapTo(0)
       .orElse(deltaStream.snapshot(
           totalStateRef.state, (delta, total) => total + delta))
-      .toState(totalStateRef.state.current));
+      .toState(0));
 
   return totalStateRef.state.combine(
     calibrationState,

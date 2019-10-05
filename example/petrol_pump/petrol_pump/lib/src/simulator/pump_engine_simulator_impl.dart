@@ -66,7 +66,7 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
           .gate(disposePendingState.map((pending) => !pending))
           .listen((_) {
         int pulses;
-        switch (_deliveryState.current) {
+        switch (_deliveryState.current()) {
           case Delivery.fast1:
           case Delivery.fast2:
           case Delivery.fast3:
@@ -87,7 +87,7 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
         }
       }));
 
-      await _disposeStreamSink.stream.legacyStream.first;
+      await _disposeStreamSink.stream.toLegacyStream().first;
     } finally {
       await subscription.cancel();
       await tickerTimer.dispose();

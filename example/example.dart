@@ -17,7 +17,7 @@ Future<void> main() async {
   final deltaStream = incrementStream.orElse(decrementStream);
 
   // value state reference (for cyclic dependencies)
-  final totalStateReference = ValueStateReference<int>(0);
+  final totalStateReference = ValueStateReference<int>();
 
   // value state
   final totalState = totalStateReference.state;

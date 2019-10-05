@@ -54,8 +54,9 @@ class FrpParadigm implements Paradigm {
   ListenSubscription documentUpdateSubscription;
 
   FrpParadigm(Document initDocument, DocumentListener documentListener) {
+    // TODO sistemare ValueStateReference(initDocument);
     ValueStateReference<Document> documentStateReference =
-        ValueStateReference(initDocument);
+        ValueStateReference();
 
     EventStream<Document> idleStream = EventStream.never();
 

@@ -2,58 +2,95 @@ import 'dart:async';
 
 import 'package:optional/optional.dart';
 
-import 'broadcast_stream.dart';
 import 'event_stream.dart';
 import 'listen_subscription.dart';
 import 'typedef.dart';
 
-ValueState<V> createValueStateFromBroadcastStream<V>(
-        BroadcastStream<V> broadcastStream) =>
-    ValueState._(broadcastStream);
+class Lazy<V> {
+  Lazy() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
 
-OptionalValueState<V> createOptionalValueStateFromBroadcastStream<V>(
-        BroadcastStream<Optional<V>> broadcastStream) =>
-    OptionalValueState._(broadcastStream);
+  // TODO implementare get, map, lift
+}
 
-ValueState<V> createValueStateFromStream<V>(V initValue, Stream<V> stream) =>
-    ValueState._fromStream(initValue, stream);
+class ValueStateSink<V> {
+  final ValueState<V> state;
 
-OptionalValueState<V> createOptionalValueStateFromStream<V>(
-        Optional<V> initValue, Stream<Optional<V>> stream) =>
-    OptionalValueState.fromStream(initValue, stream);
+  final EventStreamSink<V> _eventStreamSink;
+
+  factory ValueStateSink(V initValue, [Merger<V> merger]) =>
+      ValueStateSink<V>._(initValue, EventStreamSink<V>(merger));
+
+  ValueStateSink._(V initValue, this._eventStreamSink)
+      : this.state = ValueState._(initValue, _eventStreamSink.stream);
+
+  bool get isClosed => _eventStreamSink.isClosed;
+
+  Future<void> close() => _eventStreamSink.close();
+
+  void send(V value) => _eventStreamSink.send(value);
+}
+
+class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
+  factory OptionalValueStateSink(Optional<V> initValue,
+          [Merger<Optional<V>> merger]) =>
+      OptionalValueStateSink<V>._(
+          initValue, OptionalEventStreamSink<V>(merger));
+
+  factory OptionalValueStateSink.empty() =>
+      OptionalValueStateSink(Optional.empty());
+
+  factory OptionalValueStateSink.of(V initValue) =>
+      OptionalValueStateSink(Optional.of(initValue));
+
+  OptionalValueStateSink._(
+      Optional<V> initValue, OptionalEventStreamSink<V> eventStreamSink)
+      : super._(initValue, eventStreamSink);
+
+  @override
+  OptionalValueState<V> get state => super.state;
+
+  void sendOptionalEmpty() => send(Optional<V>.empty());
+
+  void sendOptionalOf(V value) => send(Optional<V>.of(value));
+}
 
 class ValueState<V> {
-  final BroadcastStream<V> _legacyStream;
+  final EventStream<V> _stream;
 
-  ValueState.constant(V initValue)
-      : this._(ConstantBroadcastStream<V>(initValue));
+  ValueState.constant(V initValue) : this._(initValue, EventStream<V>.never());
 
-  ValueState._fromStream(V initValue, Stream<V> stream)
-      : this._(FromBroadcastStream<V>(stream,
-            keepLastData: true, initData: initValue));
+  ValueState._(V initValue, this._stream) {
+    // TODO implementare
+    throw UnimplementedError();
+  }
 
-  ValueState._(this._legacyStream);
+  // TODO implementare
+  V current() => throw UnimplementedError();
 
-  Stream<V> get legacyStream => _legacyStream;
+  // TODO implementare
+  Lazy<V> currentLazy() => throw UnimplementedError();
 
-  V get current => _legacyStream.lastData;
+  // TODO implementare
+  OptionalValueState<VV> asOptional<VV>() => throw UnimplementedError();
 
-  OptionalValueState<VV> asOptional<VV>() =>
-      OptionalValueState._(_legacyStream as BroadcastStream<Optional<VV>>);
+  // TODO implementare
+  EventStream<V> toValues() => throw UnimplementedError();
 
-  EventStream<V> toValues() => createEventStreamFromBroadcastStream(
-      BroadcastFactoryStream<V>(() => StartWithBroadcastStream(_legacyStream,
-          startData: _legacyStream.lastData)));
+  // TODO implementare
+  EventStream<V> toUpdates() => throw UnimplementedError();
 
-  EventStream<V> toUpdates() =>
-      createEventStreamFromBroadcastStream(_legacyStream);
+  // TODO implementare
+  Stream<V> toLegacyStream() => throw UnimplementedError();
 
+  // TODO implementare
   ValueState<V> distinct([Equalizer<V> distinctEquals]) =>
-      ValueState._(DistinctBroadcastStream<V>(_legacyStream,
-          distinctEquals: distinctEquals, keepLastData: true));
+      throw UnimplementedError();
 
-  ValueState<VR> map<VR>(Mapper<V, VR> mapper) =>
-      ValueState._fromStream(mapper(current), _legacyStream.map(mapper));
+  // TODO implementare
+  ValueState<VR> map<VR>(Mapper<V, VR> mapper) => throw UnimplementedError();
 
   OptionalValueState<V> mapToOptionalOf() =>
       map<Optional<V>>((value) => Optional<V>.of(value)).asOptional<V>();
@@ -114,13 +151,9 @@ class ValueState<V> {
             (iterator..moveNext()).current);
       });
 
-  ListenSubscription listen(
-    OnDataHandler<V> onEvent, {
-    OnErrorHandler onError,
-    OnDoneHandler onDone,
-  }) =>
-      ListenSubscription(
-          _legacyStream.listen(onEvent, onError: onError, onDone: onDone));
+  // TODO implementare
+  ListenSubscription listen(OnDataHandler<V> onEvent) =>
+      throw UnimplementedError();
 
   ValueState<VR> switchMapState<VR>(ValueState<VR> Function(V value) mapper) =>
       ValueState.switchState<VR>(map<ValueState<VR>>(mapper));
@@ -129,24 +162,25 @@ class ValueState<V> {
           EventStream<ER> Function(V value) mapper) =>
       ValueState.switchStream<ER>(map<EventStream<ER>>(mapper));
 
+  // TODO implementare
   static ValueState<VR> combines<VR>(
           Iterable<ValueState> states, Combiners<VR> combiner) =>
-      ValueState._(CombineBroadcastStream<VR>(
-          states.map<BroadcastStream>((state) => state._legacyStream),
-          combiner));
+      throw UnimplementedError();
 
+  // TODO implementare
   static ValueState<V> switchState<V>(ValueState<ValueState<V>> statesState) =>
-      ValueState<V>._fromStream(
-          statesState.current.current,
-          SwitchBroadcastStream<ValueState<V>, V>(
-              statesState._legacyStream, (state) => state._legacyStream,
-              keepLastData: true));
+      throw UnimplementedError();
 
+  // TODO implementare
   static EventStream<E> switchStream<E>(
           ValueState<EventStream<E>> streamsState) =>
-      createEventStreamFromStream<E>(SwitchBroadcastStream<EventStream<E>, E>(
-          streamsState._legacyStream, (stream) => stream.legacyStream,
-          keepLastData: false));
+      throw UnimplementedError();
+/*
+  // TODO utilizzato dai lift di sodium
+  static ValueState<B> stateApply<A, B>(
+          ValueState<Mapper<A, B>> mapperState, ValueState<A> state) =>
+      throw UnimplementedError();
+*/
 }
 
 class OptionalValueState<V> extends ValueState<Optional<V>> {
@@ -157,15 +191,6 @@ class OptionalValueState<V> extends ValueState<Optional<V>> {
 
   OptionalValueState.constantOf(V initValue)
       : super.constant(Optional<V>.of(initValue));
-
-  OptionalValueState.fromStream(
-      Optional<V> initValue, Stream<Optional<V>> stream)
-      : super._fromStream(initValue, stream);
-
-  OptionalValueState._(BroadcastStream<Optional<V>> stream) : super._(stream);
-
-  @override
-  Stream<Optional<V>> get legacyStream => _legacyStream;
 
   @override
   OptionalEventStream<V> toValues() => super.toValues().asOptional<V>();

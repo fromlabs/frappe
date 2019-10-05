@@ -52,7 +52,7 @@ class PosSimulatorImpl implements PosSimulator {
           .gate(salePendingState.map((pending) => !pending))
           .orElse(_clearSaleStreamSink.stream.gate(disposePendingState));
 
-      await stopStream.legacyStream.first;
+      await stopStream.toLegacyStream().first;
     } finally {
       await subscription.cancel();
     }

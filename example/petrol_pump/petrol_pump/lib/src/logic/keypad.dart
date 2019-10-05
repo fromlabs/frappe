@@ -14,7 +14,7 @@ class Keypad extends BaseObserver {
     @required EventStream<Unit> clearStream,
     @required ValueState<bool> activeState,
   }) {
-    final valueStateRef = ValueStateReference(0);
+    final valueStateRef = ValueStateReference();
 
     final validKeyStream = keypadStream.gate(activeState);
 
@@ -59,9 +59,8 @@ class Keypad extends BaseObserver {
         .asOptional<int>()
         .mapWhereOptional();
 
-    valueStateRef.link(updateValueStream
-        .orElse(clearStream.mapTo(0))
-        .toState(valueStateRef.state.current));
+    valueStateRef
+        .link(updateValueStream.orElse(clearStream.mapTo(0)).toState(0));
 
     final beepStream = updateValueStream.mapTo(unit);
 

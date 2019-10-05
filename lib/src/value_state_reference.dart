@@ -1,34 +1,28 @@
 import 'package:optional/optional.dart';
 
-import 'broadcast_stream.dart';
 import 'value_state.dart';
 
 class ValueStateReference<V> {
-  final ValueState<V> state;
+  ValueStateReference() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
 
-  ValueStateReference(V initValue)
-      : this._(createValueStateFromBroadcastStream<V>(
-            ReferenceBroadcastStream<V>(
-                keepLastData: true, initData: initValue)));
+  // TODO implementare
+  ValueState<V> get state => throw UnimplementedError();
 
-  ValueStateReference._(this.state);
+  // TODO implementare
+  bool get isLinked => throw UnimplementedError();
 
-  bool get isLinked => _referenceStream.isLinked;
-
-  void link(ValueState<V> state) => _referenceStream.link(state.legacyStream);
-
-  ReferenceBroadcastStream<V> get _referenceStream => state.legacyStream;
+  // TODO implementare
+  void link(ValueState<V> state) => throw UnimplementedError();
 }
 
 class OptionalValueStateReference<V> extends ValueStateReference<Optional<V>> {
-  OptionalValueStateReference(Optional<V> initValue)
-      : super._(createOptionalValueStateFromBroadcastStream<V>(
-            ReferenceBroadcastStream<Optional<V>>(
-                keepLastData: true, initData: initValue)));
-
-  OptionalValueStateReference.empty() : this(Optional.empty());
-
-  OptionalValueStateReference.of(V initValue) : this(Optional.of(initValue));
+  OptionalValueStateReference() {
+    // TODO implementare
+    throw UnimplementedError();
+  }
 
   @override
   OptionalValueState<V> get state => super.state;
