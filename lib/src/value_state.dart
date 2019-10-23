@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:frappe/src/transaction.dart';
 import 'package:optional/optional.dart';
 
 import 'event_stream.dart';
@@ -58,26 +59,21 @@ class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
 }
 
 class ValueStateReference<V> {
-  ValueStateReference() {
-    // TODO implementare
-    throw UnimplementedError();
-  }
+  final ValueState<V> state;
 
-  // TODO implementare
-  ValueState<V> get state => throw UnimplementedError();
+  factory ValueStateReference() => throw UnimplementedError();
 
-  // TODO implementare
-  bool get isLinked => throw UnimplementedError();
+  ValueStateReference._(this.state);
 
-  // TODO implementare
-  void link(ValueState<V> state) => throw UnimplementedError();
+  bool get isLinked => state._isLinked;
+
+  void link(ValueState<V> state) => this.state._link(state);
 }
 
 class OptionalValueStateReference<V> extends ValueStateReference<Optional<V>> {
-  OptionalValueStateReference() {
-    // TODO implementare
-    throw UnimplementedError();
-  }
+  factory OptionalValueStateReference() => throw UnimplementedError();
+
+  OptionalValueStateReference._(OptionalValueState<V> state) : super._(state);
 
   @override
   OptionalValueState<V> get state => super.state;
@@ -87,16 +83,38 @@ class OptionalValueStateReference<V> extends ValueStateReference<Optional<V>> {
 }
 
 class ValueState<V> {
+  V _current;
+
   final EventStream<V> _stream;
 
   ValueState.constant(V initValue) : this._(initValue, EventStream<V>.never());
 
   ValueState._(V initValue, this._stream) {
-    // TODO implementare
-    throw UnimplementedError();
+    _current = initValue;
   }
 
   // TODO implementare
+  static ValueState<VR> combines<VR>(
+          Iterable<ValueState> states, Combiners<VR> combiner) =>
+      throw UnimplementedError();
+
+  // TODO implementare
+  static ValueState<V> switchState<V>(ValueState<ValueState<V>> statesState) =>
+      throw UnimplementedError();
+
+  // TODO implementare
+  static EventStream<E> switchStream<E>(
+          ValueState<EventStream<E>> streamsState) =>
+      throw UnimplementedError();
+/*
+  // TODO utilizzato dai lift di sodium
+  static ValueState<B> stateApply<A, B>(
+          ValueState<Mapper<A, B>> mapperState, ValueState<A> state) =>
+      throw UnimplementedError();
+*/
+
+  // TODO implementare
+  // se il nodo non è "ascoltato", il valore non è aggiornato per cui va fatta una pull dal padre
   V current() => throw UnimplementedError();
 
   // TODO implementare
@@ -121,8 +139,8 @@ class ValueState<V> {
   // TODO implementare
   ValueState<VR> map<VR>(Mapper<V, VR> mapper) => throw UnimplementedError();
 
-  OptionalValueState<V> mapToOptionalOf() =>
-      map<Optional<V>>((value) => Optional<V>.of(value)).asOptional<V>();
+  OptionalValueState<V> mapToOptionalOf() => runTransaction(
+      () => map<Optional<V>>((value) => Optional<V>.of(value)).asOptional<V>());
 
   ValueState<VR> combine<V2, VR>(
           ValueState<V2> state2, Combiner2<V, V2, VR> combiner) =>
@@ -192,24 +210,10 @@ class ValueState<V> {
       ValueState.switchStream<ER>(map<EventStream<ER>>(mapper));
 
   // TODO implementare
-  static ValueState<VR> combines<VR>(
-          Iterable<ValueState> states, Combiners<VR> combiner) =>
-      throw UnimplementedError();
+  bool get _isLinked => throw UnimplementedError();
 
   // TODO implementare
-  static ValueState<V> switchState<V>(ValueState<ValueState<V>> statesState) =>
-      throw UnimplementedError();
-
-  // TODO implementare
-  static EventStream<E> switchStream<E>(
-          ValueState<EventStream<E>> streamsState) =>
-      throw UnimplementedError();
-/*
-  // TODO utilizzato dai lift di sodium
-  static ValueState<B> stateApply<A, B>(
-          ValueState<Mapper<A, B>> mapperState, ValueState<A> state) =>
-      throw UnimplementedError();
-*/
+  void _link(ValueState<V> state) => throw UnimplementedError();
 }
 
 class OptionalValueState<V> extends ValueState<Optional<V>> {
@@ -222,10 +226,12 @@ class OptionalValueState<V> extends ValueState<Optional<V>> {
       : super.constant(Optional<V>.of(initValue));
 
   @override
-  OptionalEventStream<V> toValues() => super.toValues().asOptional<V>();
+  OptionalEventStream<V> toValues() =>
+      runTransaction(() => super.toValues().asOptional<V>());
 
   @override
-  OptionalEventStream<V> toUpdates() => super.toUpdates().asOptional<V>();
+  OptionalEventStream<V> toUpdates() =>
+      runTransaction(() => super.toUpdates().asOptional<V>());
 
   ValueState<bool> mapIsEmptyOptional() => map((value) => !value.isPresent);
 

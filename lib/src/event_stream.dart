@@ -1,3 +1,4 @@
+import 'package:frappe/src/transaction.dart';
 import 'package:optional/optional.dart';
 
 import 'listen_subscription.dart';
@@ -5,28 +6,25 @@ import 'typedef.dart';
 import 'value_state.dart';
 
 class EventStreamSink<E> {
-  final Merger<E> merger;
-
   final EventStream<E> stream;
 
-  // TODO implementare
-  EventStreamSink([this.merger]) : stream = throw UnimplementedError();
+  factory EventStreamSink([Merger<E> merger]) =>
+      EventStreamSink._(EventStream<E>._(merger));
 
-  // TODO implementare
-  bool get isClosed => throw UnimplementedError();
+  EventStreamSink._(this.stream);
 
-  // TODO implementare
-  Future<void> close() => throw UnimplementedError();
+  bool get isClosed => stream._isClosed;
 
-  // TODO implementare
-  void send(E event) => throw UnimplementedError();
+  Future<void> close() => stream._close();
+
+  void send(E event) => stream._send(event);
 }
 
 class OptionalEventStreamSink<E> extends EventStreamSink<Optional<E>> {
-  OptionalEventStreamSink([Merger<Optional<E>> merger]) : super(merger) {
-    // TODO implementare
-    throw UnimplementedError();
-  }
+  factory OptionalEventStreamSink([Merger<Optional<E>> merger]) =>
+      OptionalEventStreamSink._(OptionalEventStream<E>._(merger));
+
+  OptionalEventStreamSink._(OptionalEventStream<E> stream) : super._(stream);
 
   @override
   OptionalEventStream<E> get stream => super.stream;
@@ -37,27 +35,24 @@ class OptionalEventStreamSink<E> extends EventStreamSink<Optional<E>> {
 }
 
 class EventStreamReference<E> {
-  EventStreamReference() {
-    // TODO implementare
-    throw UnimplementedError();
-  }
+  final EventStream<E> stream;
 
-  // TODO implementare
-  EventStream<E> get stream => throw UnimplementedError();
+  factory EventStreamReference() => EventStreamReference._(EventStream<E>._());
 
-  // TODO implementare
-  bool get isLinked => throw UnimplementedError();
+  EventStreamReference._(this.stream);
 
-  // TODO implementare
-  void link(EventStream<E> stream) => throw UnimplementedError();
+  bool get isLinked => stream._isLinked;
+
+  void link(EventStream<E> stream) => this.stream._link(stream);
 }
 
 class OptionalEventStreamReference<E>
     extends EventStreamReference<Optional<E>> {
-  OptionalEventStreamReference() {
-    // TODO implementare
-    throw UnimplementedError();
-  }
+  factory OptionalEventStreamReference() =>
+      OptionalEventStreamReference._(OptionalEventStream<E>._());
+
+  OptionalEventStreamReference._(OptionalEventStream<E> stream)
+      : super._(stream);
 
   @override
   OptionalEventStream<E> get stream => super.stream;
@@ -67,10 +62,16 @@ class OptionalEventStreamReference<E>
 }
 
 class EventStream<E> {
-  EventStream.never() {
-    // TODO implementare
-    throw UnimplementedError();
-  }
+  final Merger<E> _merger;
+
+  EventStream.never() : _merger = null;
+
+  EventStream._([this._merger]);
+
+  // TODO implementare
+  static EventStream<E> merges<E>(Iterable<EventStream<E>> streams,
+          [Merger<E> merger]) =>
+      throw UnimplementedError();
 
   // TODO implementare
   OptionalEventStream<EE> asOptional<EE>() => throw UnimplementedError();
@@ -97,50 +98,48 @@ class EventStream<E> {
 
   EventStream<ER> mapTo<ER>(ER event) => map<ER>((_) => event);
 
-  OptionalEventStream<EE> mapToOptionalEmpty<EE>() =>
-      mapTo<Optional<EE>>(Optional<EE>.empty()).asOptional<EE>();
+  OptionalEventStream<EE> mapToOptionalEmpty<EE>() => runTransaction(
+      () => mapTo<Optional<EE>>(Optional<EE>.empty()).asOptional<EE>());
 
-  OptionalEventStream<E> mapToOptionalOf() =>
-      map<Optional<E>>((event) => Optional<E>.of(event)).asOptional<E>();
+  OptionalEventStream<E> mapToOptionalOf() => runTransaction(
+      () => map<Optional<E>>((event) => Optional<E>.of(event)).asOptional<E>());
 
   // TODO implementare
   EventStream<E> where(Filter<E> filter) => throw UnimplementedError();
 
-  // TODO implementare
-  ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) {
-    // TODO in transazione implicita
-    final reference = ValueStateReference<V>();
-    reference.link(snapshot(reference.state, accumulator).toState(initValue));
-    return reference.state;
-  }
+  ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) =>
+      runTransaction(() {
+        final reference = ValueStateReference<V>();
+        reference
+            .link(snapshot(reference.state, accumulator).toState(initValue));
+        return reference.state;
+      });
 
   // TODO implementare
   ValueState<V> accumulateLazy<V>(
           Lazy<V> lazyInitValue, Accumulator<E, V> accumulator) =>
       throw UnimplementedError();
 
-  // TODO implementare
-  EventStream<ER> collect<ER, V>(V initValue, Collector<E, V, ER> collector) {
-    // TODO in transazione implicita
-    final reference = EventStreamReference<V>();
-    final stream = snapshot(reference.stream.toState(initValue), collector);
-    reference.link(stream.map((tuple) => tuple.item2));
-    return stream.map((tuple) => tuple.item1);
-  }
+  EventStream<ER> collect<ER, V>(V initValue, Collector<E, V, ER> collector) =>
+      runTransaction(() {
+        final reference = EventStreamReference<V>();
+        final stream = snapshot(reference.stream.toState(initValue), collector);
+        reference.link(stream.map((tuple) => tuple.item2));
+        return stream.map((tuple) => tuple.item1);
+      });
 
   // TODO implementare
   EventStream<ER> collectLazy<ER, V>(
           Lazy<V> lazyInitValue, Collector<E, V, ER> collector) =>
       throw UnimplementedError();
 
-  // TODO implementare
-  // TODO in transazione implicita
-  EventStream<E> gate(ValueState<bool> conditionState) => snapshot(
-          conditionState,
-          (event, condition) =>
-              condition ? Optional<E>.of(event) : Optional<E>.empty())
-      .asOptional<E>()
-      .mapWhereOptional();
+  EventStream<E> gate(ValueState<bool> conditionState) =>
+      runTransaction(() => snapshot(
+              conditionState,
+              (event, condition) =>
+                  condition ? Optional<E>.of(event) : Optional<E>.empty())
+          .asOptional<E>()
+          .mapWhereOptional());
 
   EventStream<E> orElse(EventStream<E> stream) => merges<E>([this, stream]);
 
@@ -169,23 +168,34 @@ class EventStream<E> {
   }
 
   // TODO implementare
-  static EventStream<E> merges<E>(Iterable<EventStream<E>> streams,
-          [Merger<E> merger]) =>
-      throw UnimplementedError();
+  bool get _isClosed => throw UnimplementedError();
+
+  // TODO implementare
+  Future<void> _close() => throw UnimplementedError();
+
+  // TODO implementare
+  void _send(E event) => throw UnimplementedError();
+
+  // TODO implementare
+  bool get _isLinked => throw UnimplementedError();
+
+  // TODO implementare
+  void _link(EventStream<E> stream) => throw UnimplementedError();
 }
 
 class OptionalEventStream<E> extends EventStream<Optional<E>> {
   OptionalEventStream.never() : super.never();
 
+  OptionalEventStream._([Merger<Optional<E>> merger]) : super._(merger);
+
   @override
   OptionalValueState<E> toState(Optional<E> initValue) =>
-      super.toState(initValue).asOptional<E>();
+      runTransaction(() => super.toState(initValue).asOptional<E>());
 
   EventStream<bool> mapIsEmptyOptional() => map((event) => !event.isPresent);
 
   EventStream<bool> mapIsPresentOptional() => map((event) => event.isPresent);
 
-  // TODO in transazione unica
-  EventStream<E> mapWhereOptional() =>
-      where((event) => event.isPresent).map((event) => event.value);
+  EventStream<E> mapWhereOptional() => runTransaction(
+      () => where((event) => event.isPresent).map((event) => event.value));
 }

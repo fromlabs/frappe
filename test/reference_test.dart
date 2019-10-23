@@ -1,0 +1,173 @@
+import 'package:frappe/src/reference.dart';
+import 'package:test/test.dart';
+
+class NodeReferenceable extends Referenceable {
+  final String id;
+
+  NodeReferenceable(this.id);
+
+  @override
+  String toString() => '$id';
+}
+
+void main() {
+  test('Reference test 1', () {
+    final n1 = NodeReferenceable("node1");
+    final n2 = NodeReferenceable("node2");
+    final n3 = NodeReferenceable("node3");
+
+    final nRef1 = Reference(n1);
+    final nRef2 = Reference(n2);
+    final nRef3 = Reference(n3);
+
+    n3.addSlave(n2);
+    n2.addSlave(n1);
+
+    nRef1.dispose();
+
+    expect(n1.isReferenced, true);
+    expect(n2.isReferenced, true);
+    expect(n3.isReferenced, true);
+
+    nRef2.dispose();
+
+    expect(n1.isReferenced, true);
+    expect(n2.isReferenced, true);
+    expect(n3.isReferenced, true);
+
+    nRef3.dispose();
+
+    expect(n1.isReferenced, false);
+    expect(n2.isReferenced, false);
+    expect(n3.isReferenced, false);
+  });
+
+  test('Reference test 2', () {
+    final n1 = NodeReferenceable("node1");
+    final n2 = NodeReferenceable("node2");
+    final n3 = NodeReferenceable("node3");
+
+    final nRef1 = Reference(n1);
+    final nRef2 = Reference(n2);
+    final nRef3 = Reference(n3);
+
+    n3.addSlave(n2);
+    n2.addSlave(n1);
+    n1.addSlave(n3);
+
+    nRef1.dispose();
+
+    expect(n1.isReferenced, true);
+    expect(n2.isReferenced, true);
+    expect(n3.isReferenced, true);
+
+    nRef2.dispose();
+
+    expect(n1.isReferenced, true);
+    expect(n2.isReferenced, true);
+    expect(n3.isReferenced, true);
+
+    nRef3.dispose();
+
+    expect(n1.isReferenced, false);
+    expect(n2.isReferenced, false);
+    expect(n3.isReferenced, false);
+  });
+
+  test('Reference test 3', () {
+    final n1 = NodeReferenceable("node1");
+
+    final nRef1 = Reference(n1);
+
+    n1.addSlave(n1);
+
+    expect(n1.isReferenced, true);
+
+    nRef1.dispose();
+
+    expect(n1.isReferenced, false);
+  });
+
+  test('Reference test 4', () {
+    final n1 = NodeReferenceable("node1");
+    final n2 = NodeReferenceable("node2");
+
+    expect(() => n1.addSlave(n2), throwsArgumentError);
+
+    Reference(n1);
+
+    n1.addSlave(n2);
+  });
+
+  test('Reference test 5', () {
+    final n1 = NodeReferenceable("node1");
+
+    final nRef1 = Reference(n1);
+
+    expect(n1.isReferenced, true);
+
+    nRef1.dispose();
+
+    expect(n1.isReferenced, false);
+  });
+
+  test('Reference test 6', () {
+    final n1 = NodeReferenceable("node1");
+    final n2 = NodeReferenceable("node2");
+
+    final nRef1 = Reference(n1);
+    final nRef2 = Reference(n2);
+
+    n1.addSlave(n2);
+
+    expect(n1.isReferenced, true);
+    expect(n2.isReferenced, true);
+
+    nRef2.dispose();
+
+    expect(n1.isReferenced, true);
+    expect(n2.isReferenced, true);
+
+    nRef1.dispose();
+
+    expect(n1.isReferenced, false);
+    expect(n2.isReferenced, false);
+  });
+
+  test('Reference test 7', () {
+    final n1 = NodeReferenceable("node1");
+    final n2 = NodeReferenceable("node2");
+
+    final nRef1 = Reference(n1);
+    final nRef2 = Reference(n2);
+
+    n1.addSlave(n2);
+
+    expect(n1.isReferenced, true);
+    expect(n2.isReferenced, true);
+
+    nRef1.dispose();
+
+    expect(n1.isReferenced, false);
+    expect(n2.isReferenced, true);
+
+    nRef2.dispose();
+
+    expect(n1.isReferenced, false);
+    expect(n2.isReferenced, false);
+  });
+
+  test('Reference test 8', () {
+    final n1 = NodeReferenceable("node1");
+    final n2 = NodeReferenceable("node2");
+
+    Reference(n1);
+    final nRef2 = Reference(n2);
+
+    n1.addSlave(n2);
+
+    nRef2.dispose();
+
+    expect(n2.isReferenced, true);
+  });
+}
