@@ -20,8 +20,8 @@ void main() {
     final nRef2 = Reference(n2);
     final nRef3 = Reference(n3);
 
-    n3.addSlave(n2);
-    n2.addSlave(n1);
+    n3.reference(n2);
+    n2.reference(n1);
 
     nRef1.dispose();
 
@@ -51,9 +51,9 @@ void main() {
     final nRef2 = Reference(n2);
     final nRef3 = Reference(n3);
 
-    n3.addSlave(n2);
-    n2.addSlave(n1);
-    n1.addSlave(n3);
+    n3.reference(n2);
+    n2.reference(n1);
+    n1.reference(n3);
 
     nRef1.dispose();
 
@@ -79,7 +79,7 @@ void main() {
 
     final nRef1 = Reference(n1);
 
-    n1.addSlave(n1);
+    n1.reference(n1);
 
     expect(n1.isReferenced, true);
 
@@ -92,11 +92,16 @@ void main() {
     final n1 = NodeReferenceable("node1");
     final n2 = NodeReferenceable("node2");
 
-    expect(() => n1.addSlave(n2), throwsArgumentError);
+    expect(() => n1.reference(n2), throwsArgumentError);
 
-    Reference(n1);
+    final n1Ref = Reference(n1);
 
-    n1.addSlave(n2);
+    n1.reference(n2);
+
+    n1Ref.dispose();
+
+    expect(n1.isReferenced, false);
+    expect(n2.isReferenced, false);
   });
 
   test('Reference test 5', () {
@@ -118,7 +123,7 @@ void main() {
     final nRef1 = Reference(n1);
     final nRef2 = Reference(n2);
 
-    n1.addSlave(n2);
+    n1.reference(n2);
 
     expect(n1.isReferenced, true);
     expect(n2.isReferenced, true);
@@ -141,7 +146,7 @@ void main() {
     final nRef1 = Reference(n1);
     final nRef2 = Reference(n2);
 
-    n1.addSlave(n2);
+    n1.reference(n2);
 
     expect(n1.isReferenced, true);
     expect(n2.isReferenced, true);
@@ -164,7 +169,7 @@ void main() {
     Reference(n1);
     final nRef2 = Reference(n2);
 
-    n1.addSlave(n2);
+    n1.reference(n2);
 
     nRef2.dispose();
 
