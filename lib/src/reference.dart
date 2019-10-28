@@ -129,8 +129,11 @@ abstract class Referenceable {
 
   bool get isReferenced => _isReferenced;
 
-  HostedReference<R> reference<R extends Referenceable>(R value) =>
-      _hostedGroup.add(HostedReference(this, value));
+  HostedReference<R> reference<R extends Referenceable>(R value) {
+    _hostedGroup._checkDisposed();
+
+    return _hostedGroup.add(HostedReference(this, value));
+  }
 
   @protected
   void onUnreferenced() {

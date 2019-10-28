@@ -144,32 +144,6 @@ void main() {
   });
 
   test('Node test 8', () {
-    Reference<IndexedNode<int>> node1Ref;
-    Reference<IndexedNode<int>> node2Ref;
-
-    // TODO possibilità di registrare un handler evaluate sul nodo
-    // TODO possibilità di registrare un handler onTransactionBegin sul nodo
-
-    Transaction.run((tx) {
-      final node1 = tx.node(IndexedNode<int>(debugLabel: 'INPUT'));
-      final node2 = tx.node(IndexedNode<int>(
-          debugLabel: 'DUPLIFY', evaluate: (inputs) => 2 * inputs[0]));
-
-      node2.link(node1);
-
-      node1Ref = Reference(node1);
-      node2Ref = Reference(node2);
-    });
-
-    Transaction.run((tx) {
-      tx.setEvaluation(node1Ref.value, 1);
-    });
-
-    node1Ref.dispose();
-    node2Ref.dispose();
-  });
-
-  test('Node test 9', () {
     IndexedNode<int> node1;
     IndexedNode<int> node2;
     Reference<IndexedNode<int>> node2Ref;
@@ -202,6 +176,115 @@ void main() {
     expect(node1.isReferenced, true);
     expect(node2.isReferenced, true);
 
-    node2bRef.dispose();
+    Transaction.run((tx) {
+      expect(node1.isReferenced, true);
+      expect(node2.isReferenced, true);
+
+      node2bRef.dispose();
+
+      tx.node(node2);
+
+      expect(node1.isReferenced, false);
+      expect(node2.isReferenced, true);
+
+      expect(() => node2.link(node1), throwsStateError);
+    });
+
+    expect(node1.isReferenced, false);
+    expect(node2.isReferenced, false);
+  });
+
+  test('Node evaluation test 1', () {
+    Reference<IndexedNode<int>> node1Ref;
+    Reference<IndexedNode<int>> node2Ref;
+
+    Transaction.run((tx) {
+      final node1 = tx.node(IndexedNode<int>(debugLabel: 'INPUT'));
+      final node2 = tx.node(IndexedNode<int>(
+          debugLabel: 'DUPLIFY', evaluate: (inputs) => 2 * inputs[0]));
+
+      node2.link(node1);
+
+      node1Ref = Reference(node1);
+      node2Ref = Reference(node2);
+    });
+
+    Transaction.run((tx) {
+      tx.setEvaluation(node1Ref.value, 1);
+    });
+
+    node1Ref.dispose();
+    node2Ref.dispose();
+  });
+
+  test('Node evaluation test 2', () {
+    Reference<IndexedNode<int>> input1Ref;
+    Reference<IndexedNode<int>> input2Ref;
+    Reference<IndexedNode<int>> input3Ref;
+    Reference<IndexedNode<int>> merge1Ref;
+
+    Transaction.run((tx) {
+      final input1 = tx.node(IndexedNode<int>(debugLabel: 'INPUT1'));
+      final input2 = tx.node(IndexedNode<int>(debugLabel: 'INPUT2'));
+      final input3 = tx.node(IndexedNode<int>(debugLabel: 'INPUT3'));
+
+      final node21 = tx.node(IndexedNode<int>(
+          debugLabel: 'DUPLIFY1', evaluate: (inputs) => 2 * inputs[0]))
+        ..link(input1);
+
+      final node22 = tx.node(IndexedNode<int>(
+          debugLabel: 'TRIPLIFY2', evaluate: (inputs) => 3 * inputs[0]))
+        ..link(input2);
+
+      final merge2 = tx.node(IndexedNode<int>(
+          debugLabel: 'MERGE2',
+          canEvaluatePartially: true,
+          evaluate: (inputs) => inputs.containsKey(0)
+              ? inputs[0]
+              : (inputs.containsKey(1)
+                  ? inputs[1]
+                  : throw StateError('Node not evaluated'))))
+        ..link(input3)
+        ..link(node22);
+
+      final node32 = tx.node(IndexedNode<int>(
+          debugLabel: 'TRIPLIFY3', evaluate: (inputs) => 3 * inputs[0]))
+        ..link(merge2);
+
+      final merge1 = tx.node(IndexedNode<int>(
+          debugLabel: 'MERGE1',
+          canEvaluatePartially: true,
+          evaluate: (inputs) => inputs.containsKey(0)
+              ? inputs[0]
+              : (inputs.containsKey(1)
+                  ? inputs[1]
+                  : throw StateError('Node not evaluated'))))
+        ..link(node32)
+        ..link(node21);
+
+      final listen1 = tx.node(IndexedNode<int>(
+          debugLabel: 'LISTEN1',
+          evaluate: (inputs) => inputs.containsKey(0)
+              ? inputs[0]
+              : (inputs.containsKey(1)
+                  ? inputs[1]
+                  : throw StateError('Node not evaluated'))))
+        ..link(merge1);
+
+      input1Ref = Reference(input1);
+      input2Ref = Reference(input2);
+      input3Ref = Reference(input3);
+      merge1Ref = Reference(merge1);
+    });
+
+    Transaction.run((tx) {
+      tx.setEvaluation(input1Ref.value, 1);
+      tx.setEvaluation(input2Ref.value, 1);
+    });
+
+    input1Ref.dispose();
+    input2Ref.dispose();
+    input3Ref.dispose();
+    merge1Ref.dispose();
   });
 }
