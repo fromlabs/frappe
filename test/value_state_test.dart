@@ -1,10 +1,9 @@
 import 'package:frappe/frappe.dart';
-import 'package:frappe/src/broadcast_stream.dart';
 import 'package:test/test.dart';
 
 void main() {
   tearDown(() {
-    assertEmptyBroadcastStreamSubscribers();
+    assertCleanup();
   });
 
   group('ValueState', () {

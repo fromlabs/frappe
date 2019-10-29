@@ -75,6 +75,28 @@ void main() {
     });
   });
 
+  test('Node test 4b', () {
+    IndexedNode<int> node1 = IndexedNode<int>(debugLabel: 'N1');
+    IndexedNode<int> node2;
+
+    Transaction.run((tx) {
+      node2 = tx.node(IndexedNode<int>(debugLabel: 'N2'));
+
+      node2.link(node1);
+    });
+  });
+
+  test('Node test 4c', () {
+    IndexedNode<int> node1;
+    IndexedNode<int> node2 = IndexedNode<int>(debugLabel: 'N2');
+
+    Transaction.run((tx) {
+      node1 = tx.node(IndexedNode<int>(debugLabel: 'N1'));
+
+      expect(() => node2.link(node1), throwsArgumentError);
+    });
+  });
+
   test('Node test 5', () {
     IndexedNode<int> node1;
     IndexedNode<int> node2;
@@ -201,7 +223,8 @@ void main() {
     Transaction.run((tx) {
       final node1 = tx.node(IndexedNode<int>(debugLabel: 'INPUT'));
       final node2 = tx.node(IndexedNode<int>(
-          debugLabel: 'DUPLIFY', evaluate: (inputs) => 2 * inputs[0]));
+          debugLabel: 'DUPLIFY',
+          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0])));
 
       node2.link(node1);
 
@@ -210,7 +233,7 @@ void main() {
     });
 
     Transaction.run((tx) {
-      tx.setEvaluation(node1Ref.value, 1);
+      tx.setValue(node1Ref.value, 1);
     });
 
     node1Ref.dispose();
@@ -222,6 +245,7 @@ void main() {
     Reference<IndexedNode<int>> input2Ref;
     Reference<IndexedNode<int>> input3Ref;
     Reference<IndexedNode<int>> merge1Ref;
+    Reference<IndexedNode<int>> listenRef;
 
     Transaction.run((tx) {
       final input1 = tx.node(IndexedNode<int>(debugLabel: 'INPUT1'));
@@ -229,62 +253,96 @@ void main() {
       final input3 = tx.node(IndexedNode<int>(debugLabel: 'INPUT3'));
 
       final node21 = tx.node(IndexedNode<int>(
-          debugLabel: 'DUPLIFY1', evaluate: (inputs) => 2 * inputs[0]))
+          debugLabel: 'DUPLIFY1',
+          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0])))
         ..link(input1);
 
       final node22 = tx.node(IndexedNode<int>(
-          debugLabel: 'TRIPLIFY2', evaluate: (inputs) => 3 * inputs[0]))
+          debugLabel: 'TRIPLIFY2',
+          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0])))
         ..link(input2);
 
       final merge2 = tx.node(IndexedNode<int>(
-          debugLabel: 'MERGE2',
-          canEvaluatePartially: true,
-          evaluate: (inputs) => inputs.containsKey(0)
-              ? inputs[0]
-              : (inputs.containsKey(1)
-                  ? inputs[1]
-                  : throw StateError('Node not evaluated'))))
+        debugLabel: 'MERGE2',
+        canEvaluatePartially: true,
+        evaluateHandler: (inputs) => inputs.isNotEmpty
+            ? NodeEvaluation(inputs.containsKey(0) ? inputs[0] : inputs[1])
+            : NodeEvaluation.not(),
+      ))
         ..link(input3)
         ..link(node22);
 
       final node32 = tx.node(IndexedNode<int>(
-          debugLabel: 'TRIPLIFY3', evaluate: (inputs) => 3 * inputs[0]))
+          debugLabel: 'TRIPLIFY3',
+          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0])))
         ..link(merge2);
 
+      int merge1Value = 1;
       final merge1 = tx.node(IndexedNode<int>(
-          debugLabel: 'MERGE1',
-          canEvaluatePartially: true,
-          evaluate: (inputs) => inputs.containsKey(0)
-              ? inputs[0]
-              : (inputs.containsKey(1)
-                  ? inputs[1]
-                  : throw StateError('Node not evaluated'))))
+        debugLabel: 'MERGE1',
+        canEvaluatePartially: true,
+        evaluateHandler: (inputs) => inputs.isNotEmpty
+            ? NodeEvaluation(inputs.containsKey(0) ? inputs[0] : inputs[1])
+            : NodeEvaluation.not(),
+        commitHandler: (value) => merge1Value = value,
+      ))
         ..link(node32)
         ..link(node21);
 
-      final listen1 = tx.node(IndexedNode<int>(
-          debugLabel: 'LISTEN1',
-          evaluate: (inputs) => inputs.containsKey(0)
-              ? inputs[0]
-              : (inputs.containsKey(1)
-                  ? inputs[1]
-                  : throw StateError('Node not evaluated'))))
+      var previousEvaluation = NodeEvaluation.not();
+      final distinct = tx.node(IndexedNode<int>(
+        debugLabel: 'DISTINCT',
+        evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
+                inputs[0] != previousEvaluation.value
+            ? NodeEvaluation(inputs[0])
+            : NodeEvaluation.not(),
+        commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
+      ))
         ..link(merge1);
+
+      final listen = tx.node(IndexedNode<int>(
+        debugLabel: 'LISTEN',
+        evaluateHandler: (inputs) => NodeEvaluation(inputs[0]),
+        commitHandler: (value) => print('commit: $value'),
+        publishHandler: (value) => print('publish: $value'),
+      ))
+        ..link(distinct);
 
       input1Ref = Reference(input1);
       input2Ref = Reference(input2);
       input3Ref = Reference(input3);
       merge1Ref = Reference(merge1);
+      listenRef = Reference(listen);
     });
 
     Transaction.run((tx) {
-      tx.setEvaluation(input1Ref.value, 1);
-      tx.setEvaluation(input2Ref.value, 1);
+      tx.setValue(input1Ref.value, 1);
+      tx.setValue(input2Ref.value, 1);
     });
 
+    Transaction.run((tx) {
+      tx.setValue(input1Ref.value, 1);
+      tx.setValue(input2Ref.value, 2);
+    });
+
+    Transaction.run((tx) {
+      tx.setValue(input1Ref.value, 1);
+      tx.setValue(input2Ref.value, 2);
+    });
+/*
+    Transaction.run((tx) {
+      tx.setEvaluation(input1Ref.value, 1);      
+      if (!tx.isEvaluated(input1Ref.value)) {
+        tx.setEvaluation(input1Ref.value, 2);
+      } else {
+        throw UnsupportedError('Node already with a value');
+      }
+    });
+*/
     input1Ref.dispose();
     input2Ref.dispose();
     input3Ref.dispose();
     merge1Ref.dispose();
+    listenRef.dispose();
   });
 }

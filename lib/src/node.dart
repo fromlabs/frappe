@@ -17,21 +17,37 @@ void assertAllNodesUnlinked() {
   }
 }
 
+enum TransactionPhase { OPENED, EVALUATION, COMMIT, PUBLISH, CLOSED }
+
+class NodeEvaluation<S> {
+  final S _value;
+
+  final bool isEvaluated;
+
+  NodeEvaluation(this._value) : isEvaluated = true;
+
+  NodeEvaluation.not()
+      : isEvaluated = false,
+        _value = null;
+
+  bool get isNotEvaluated => !isEvaluated;
+
+  S get value => isEvaluated ? _value : throw StateError('Not evaluated');
+}
+
 class Transaction {
-  final ReferenceGroup _referenceGroup = ReferenceGroup();
-
-  final Map<Node, dynamic> _evaluations = Map.identity();
-
-  bool _isClosed = false;
-
-  bool get isClosed => _isClosed;
-
   static bool get isInTransaction => currentTransaction != null;
+
+  static Transaction get requiredTransaction => currentTransaction != null
+      ? currentTransaction
+      : throw UnsupportedError('Required explicit transaction');
 
   static Transaction get currentTransaction {
     final Transaction transaction = Zone.current[transactionZoneParameter];
 
-    return transaction != null && !transaction.isClosed ? transaction : null;
+    return transaction != null && transaction.phase != TransactionPhase.CLOSED
+        ? transaction
+        : null;
   }
 
   static T run<T>(T Function(Transaction) runner) {
@@ -48,6 +64,10 @@ class Transaction {
 
           transaction._evaluate();
 
+          transaction._commit();
+
+          transaction._publish();
+
           return result;
         }, zoneValues: {transactionZoneParameter: transaction});
         return result;
@@ -56,6 +76,14 @@ class Transaction {
       }
     }
   }
+
+  final ReferenceGroup _referenceGroup = ReferenceGroup();
+
+  final Map<Node, dynamic> _evaluations = Map.identity();
+
+  TransactionPhase _phase = TransactionPhase.OPENED;
+
+  TransactionPhase get phase => _phase;
 
   N node<N extends Node>(N node) {
     reference(node);
@@ -72,14 +100,19 @@ class Transaction {
   void onError(Object error, StackTrace stacktrace) =>
       print('Uncaught error: $error\n $stacktrace');
 
-  bool isEvaluated(Node node) => _evaluations.containsKey(node);
+  bool hasValue(Node node) => _phase == TransactionPhase.OPENED
+      ? _evaluations.containsKey(node)
+      : throw UnsupportedError(
+          'Node value is exposed only in opened transaction phase');
 
-  S getEvaluation<S>(Node<S> node) => isEvaluated(node)
-      ? _evaluations[node]
-      : throw StateError('Not evaluated');
+  S getValue<S>(Node<S> node) =>
+      hasValue(node) ? _evaluations[node] : throw StateError('Not evaluated');
 
-  void setEvaluation<S>(Node<S> node, S output) {
-    if (!node.isReferenced) {
+  void setValue<S>(Node<S> node, S output) {
+    if (_phase != TransactionPhase.OPENED) {
+      throw UnsupportedError(
+          'Node value is exposed only in opened transaction phase');
+    } else if (!node.isReferenced) {
       throw ArgumentError('Node $node is not referenced');
     }
 
@@ -87,17 +120,17 @@ class Transaction {
   }
 
   void _close() {
-    if (_isClosed) {
+    if (phase == TransactionPhase.CLOSED) {
       throw StateError('Transaction is closed');
     }
 
     _referenceGroup.dispose();
 
-    _isClosed = true;
+    _phase = TransactionPhase.CLOSED;
   }
 
   void _evaluate() {
-    print('--> Evaluation: $_propagationCount');
+    _phase = TransactionPhase.EVALUATION;
 
     final pendingNodes = SplayTreeSet<Node>((node1, node2) =>
         node2._evaluationPriority - node1._evaluationPriority);
@@ -112,8 +145,22 @@ class Transaction {
 
       _evaluateNode(pendingNode, pendingNodes, forceEvaluation: true);
     }
+  }
 
-    _evaluations.forEach((node, value) => print('$node = $value'));
+  void _commit() {
+    _phase = TransactionPhase.COMMIT;
+
+    for (final entry in _evaluations.entries) {
+      entry.key._commit(entry.value);
+    }
+  }
+
+  void _publish() {
+    _phase = TransactionPhase.PUBLISH;
+
+    for (final entry in _evaluations.entries) {
+      entry.key._publish(entry.value);
+    }
   }
 
   void _evaluateTargetNodes(Node sourceNode, Set<Node> pendingNodes) {
@@ -126,30 +173,34 @@ class Transaction {
       {bool forceEvaluation = false}) {
     final inputMap = Map.fromIterable(
         node._sourceReferences.entries
-            .where((entry) => isEvaluated(entry.value.value)),
+            .where((entry) => _evaluations.containsKey(entry.value.value)),
         key: (entry) => entry.key,
-        value: (entry) => getEvaluation(entry.value.value));
+        value: (entry) => _evaluations[entry.value.value]);
 
     if (forceEvaluation || inputMap.length == node._sourceReferences.length) {
-      final output = node._evaluateInputs(inputMap);
+      final evaluation = node._evaluate(inputMap);
 
-      setEvaluation(node, output);
+      if (evaluation.isEvaluated) {
+        _evaluations[node] = evaluation.value;
 
-      _evaluateTargetNodes(node, pendingNodes);
+        _evaluateTargetNodes(node, pendingNodes);
+      }
     } else if (node._canEvaluatePartially) {
       pendingNodes.add(node);
     }
   }
 }
 
-// TODO possibilità di registrare un handler onTransactionBegin sul nodo
-// TODO possibilità di registrare un handler onTransactionEnd sul nodo
 abstract class Node<S> extends Referenceable {
   bool _canEvaluatePartially;
 
   final String _debugLabel;
 
-  final S Function(Map inputs) _evaluate;
+  NodeEvaluation<S> Function(Map inputs) _evaluateHandler;
+
+  void Function(S) _commitHandler;
+
+  void Function(S) _publishHandler;
 
   final Map<dynamic, HostedReference<Node>> _sourceReferences = Map.identity();
 
@@ -157,15 +208,23 @@ abstract class Node<S> extends Referenceable {
 
   int _evaluationPriority;
 
-  Node(
-      {String debugLabel,
-      bool canEvaluatePartially = false,
-      S Function(Map inputs) evaluate})
-      : _debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
+  Node({
+    String debugLabel,
+    bool canEvaluatePartially = false,
+    NodeEvaluation<S> Function(Map inputs) evaluateHandler,
+    void Function(S) commitHandler,
+    void Function(S) publishHandler,
+  })  : _debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
         _canEvaluatePartially = canEvaluatePartially,
-        _evaluate = evaluate {
+        _evaluateHandler = evaluateHandler,
+        _commitHandler = commitHandler,
+        _publishHandler = publishHandler {
     _evaluationPriority = _canEvaluatePartially ? 1 : 0;
   }
+
+  @override
+  String toString() =>
+      '[$_debugLabel:$runtimeType:${isReferenced ? 'REFERENCED' : 'UNREFERENCED'}:$_evaluationPriority]';
 
   void _linkSource(key, Node source) {
     if (!isReferenced) {
@@ -226,35 +285,65 @@ abstract class Node<S> extends Referenceable {
     }
   }
 
-  @override
-  String toString() =>
-      '[$_debugLabel:$runtimeType:${isReferenced ? 'REFERENCED' : 'UNREFERENCED'}:$_evaluationPriority]';
-
-  S _evaluateInputs(Map inputMap) => _evaluate(inputMap);
-
   void _propagatePriority(int evaluationPriority) {
-    _propagationCount++;
-    _evaluationPriority += evaluationPriority;
-    for (final sourceReference in _sourceReferences.values) {
-      sourceReference.value._propagatePriority(evaluationPriority);
+    if (evaluationPriority > 0) {
+      _evaluationPriority += evaluationPriority;
+      for (final sourceReference in _sourceReferences.values) {
+        sourceReference.value._propagatePriority(evaluationPriority);
+      }
     }
   }
-}
 
-int _propagationCount = 0;
+  set evaluateHandler(NodeEvaluation<S> Function(Map inputs) evaluateHandler) {
+    if (_evaluateHandler != null) {
+      throw StateError('Evaluate handler already defined');
+    }
+
+    _evaluateHandler = evaluateHandler;
+  }
+
+  set commitHandler(void Function(S) commitHandler) {
+    if (_commitHandler != null) {
+      throw StateError('Commit handler already defined');
+    }
+
+    _commitHandler = commitHandler;
+  }
+
+  set publishHandler(void Function(S) publishHandler) {
+    if (_publishHandler != null) {
+      throw StateError('Publish handler already defined');
+    }
+
+    _publishHandler = publishHandler;
+  }
+
+  NodeEvaluation<S> _evaluate(Map inputMap) => _evaluateHandler != null
+      ? _evaluateHandler(inputMap)
+      : throw UnsupportedError('Node evaluation');
+
+  void _commit(S value) => _commitHandler?.call(value);
+
+  void _publish(S value) => _publishHandler?.call(value);
+}
 
 class IndexedNode<S> extends Node<S> {
   final List<int> _sourceIndexes = [];
   int _id = 0;
 
-  IndexedNode(
-      {String debugLabel,
-      bool canEvaluatePartially = false,
-      S Function(Map inputs) evaluate})
-      : super(
-            debugLabel: debugLabel,
-            canEvaluatePartially: canEvaluatePartially,
-            evaluate: evaluate);
+  IndexedNode({
+    String debugLabel,
+    bool canEvaluatePartially = false,
+    NodeEvaluation<S> Function(Map inputs) evaluateHandler,
+    void Function(S) commitHandler,
+    void Function(S) publishHandler,
+  }) : super(
+          debugLabel: debugLabel,
+          canEvaluatePartially: canEvaluatePartially,
+          evaluateHandler: evaluateHandler,
+          commitHandler: commitHandler,
+          publishHandler: publishHandler,
+        );
 
   void link(Node source) {
     _linkSource(_id, source);
@@ -275,14 +364,19 @@ class IndexedNode<S> extends Node<S> {
 }
 
 class NamedNode<S> extends Node<S> {
-  NamedNode(
-      {String debugLabel,
-      bool canEvaluatePartially = false,
-      S Function(Map inputs) evaluate})
-      : super(
-            debugLabel: debugLabel,
-            canEvaluatePartially: canEvaluatePartially,
-            evaluate: evaluate);
+  NamedNode({
+    String debugLabel,
+    bool canEvaluatePartially = false,
+    NodeEvaluation<S> Function(Map inputs) evaluateHandler,
+    void Function(S) commitHandler,
+    void Function(S) publishHandler,
+  }) : super(
+          debugLabel: debugLabel,
+          canEvaluatePartially: canEvaluatePartially,
+          evaluateHandler: evaluateHandler,
+          commitHandler: commitHandler,
+          publishHandler: publishHandler,
+        );
 
   void link(key, Node source, Transaction transaction) =>
       _linkSource(key, source);

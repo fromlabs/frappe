@@ -29,7 +29,7 @@ class ValueStateSink<V> {
 
   bool get isClosed => _eventStreamSink.isClosed;
 
-  Future<void> close() => _eventStreamSink.close();
+  void close() => _eventStreamSink.close();
 
   void send(V value) => _eventStreamSink.send(value);
 }

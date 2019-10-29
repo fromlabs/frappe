@@ -1,8 +1,5 @@
+import 'package:frappe/src/node.dart';
 import 'package:frappe/src/typedef.dart';
 
-// TODO gestione delle transazioni
-
-T runTransaction<T>(Runner<T> runner) {
-  // TODO implementare
-  throw UnimplementedError();
-}
+T runTransaction<T>(Runner<T> runner) =>
+    Transaction.run((transaction) => runner());

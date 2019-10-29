@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 import 'package:frappe/frappe.dart';
+import 'package:petrol_pump/src/util.dart';
 
 import '../model.dart';
 import '../petrol_pump.dart';
@@ -87,7 +88,7 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
         }
       }));
 
-      await _disposeStreamSink.stream.toLegacyStream().first;
+      await toLegacyStream(_disposeStreamSink.stream).first;
     } finally {
       await subscription.cancel();
       await tickerTimer.dispose();

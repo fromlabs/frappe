@@ -1,13 +1,5 @@
-import 'dart:async';
-
-class ListenSubscription {
-  ListenSubscription() {
-    // TODO implementare
-    throw UnimplementedError();
-  }
-
-  // TODO implementare
-  Future<void> cancel() => throw UnimplementedError();
+abstract class ListenSubscription {
+  void cancel();
 
   // TODO implementare
   ListenSubscription append(ListenSubscription listener) =>

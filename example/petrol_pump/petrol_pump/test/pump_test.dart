@@ -99,7 +99,7 @@ void main() {
           .map<Future>((disposable) => disposable?.dispose())
           .where((future) => future != null));
 
-      assertEmptyBroadcastStreamSubscribers();
+      assertCleanup();
     });
 
     test('No action', () {});
@@ -264,7 +264,7 @@ void main() {
           .map<Future>((disposable) => disposable?.dispose())
           .where((future) => future != null));
 
-      assertEmptyBroadcastStreamSubscribers();
+      assertCleanup();
     });
 
     test('No pump', () async {

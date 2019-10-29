@@ -129,6 +129,8 @@ abstract class Referenceable {
 
   bool get isReferenced => _isReferenced;
 
+  bool get isUnreferenced => !_isReferenced;
+
   HostedReference<R> reference<R extends Referenceable>(R value) {
     _hostedGroup._checkDisposed();
 

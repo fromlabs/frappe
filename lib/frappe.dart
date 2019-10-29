@@ -1,6 +1,6 @@
 library frappe;
 
-export 'src/broadcast_stream.dart' show assertEmptyBroadcastStreamSubscribers;
+export 'src/base.dart' show assertCleanup;
 export 'src/disposable.dart';
 export 'src/event_stream.dart'
     show

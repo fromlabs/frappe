@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 import 'package:frappe/frappe.dart';
+import 'package:petrol_pump/src/util.dart';
 
 import '../model.dart';
 import '../petrol_pump.dart';
@@ -52,7 +53,7 @@ class PosSimulatorImpl implements PosSimulator {
           .gate(salePendingState.map((pending) => !pending))
           .orElse(_clearSaleStreamSink.stream.gate(disposePendingState));
 
-      await stopStream.toLegacyStream().first;
+      await toLegacyStream(stopStream).first;
     } finally {
       await subscription.cancel();
     }

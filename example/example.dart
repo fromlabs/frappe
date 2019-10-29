@@ -1,4 +1,5 @@
 import 'package:frappe/frappe.dart';
+import 'package:frappe/src/base.dart';
 
 Future<void> main() async {
   // event stream sink
@@ -61,7 +62,7 @@ Future<void> main() async {
   await subscription.cancel();
 
   // check if all listeners are canceled
-  assertEmptyBroadcastStreamSubscribers();
+  assertCleanup();
 }
 
 Future<void> get delay => Future(() {});
