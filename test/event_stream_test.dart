@@ -265,6 +265,108 @@ void main() {
 
       sink.close();
     });
+
+    test('Test 11', () {
+      final sink = EventStreamSink<int>();
+
+      final events1 = Queue<int>();
+
+      final subscription1 = runTransaction(() =>
+          sink.stream.map<int>((value) => 2 * value).toState(0).listen((event) {
+            events1.addLast(event);
+          }));
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(0));
+      expect(events1, isEmpty);
+
+      sink.send(1);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+
+      subscription1.cancel();
+
+      sink.close();
+    });
+
+    test('Test 12', () {
+      final sink = EventStreamSink<int>();
+
+      final events1 = Queue<int>();
+
+      final subscription1 = runTransaction(() {
+        sink.send(1);
+
+        return sink.stream
+            .map<int>((value) => 2 * value)
+            .toState(0)
+            .listen((event) {
+          events1.addLast(event);
+        });
+      });
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+
+      sink.send(2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(4));
+      expect(events1, isEmpty);
+
+      subscription1.cancel();
+
+      sink.close();
+    });
+
+    test('Test 13', () {
+      final sink = EventStreamSink<int>();
+
+      sink.send(0);
+
+      final events1 = Queue<int>();
+      final subscription1 = sink.stream.listen((event) {
+        events1.addLast(event);
+      });
+
+      final events2 = Queue<int>();
+      final subscriptions = subscription1.append(sink.stream.listen((event) {
+        events2.addLast(event);
+      }));
+
+      expect(events1, isEmpty);
+      expect(events2, isEmpty);
+
+      sink.send(1);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(1));
+      expect(events1, isEmpty);
+      expect(events2, isNotEmpty);
+      expect(events2.removeLast(), equals(1));
+      expect(events2, isEmpty);
+
+      sink.send(2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+      expect(events2, isNotEmpty);
+      expect(events2.removeLast(), equals(2));
+      expect(events2, isEmpty);
+
+      subscriptions.cancel();
+
+      sink.send(3);
+
+      expect(events1, isEmpty);
+      expect(events2, isEmpty);
+
+      sink.close();
+    });
   });
 
   group('OptionalEventStream', () {

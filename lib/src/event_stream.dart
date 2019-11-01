@@ -219,7 +219,7 @@ class EventStream<E> {
           ValueState<V2> fromState, Combiner2<E, V2, ER> combiner) =>
       throw UnimplementedError();
 
-  ListenSubscription listen(OnDataHandler<E> onEvent) =>
+  ListenSubscription listen(ValueHandler<E> onEvent) =>
       Transaction.run((transaction) {
         final listenNode = IndexedNode<E>(
           evaluateHandler: _defaultEvaluateHandler,
@@ -233,7 +233,7 @@ class EventStream<E> {
         return _ReferenceListenSubscription(reference);
       });
 
-  ListenSubscription listenOnce(OnDataHandler<E> onEvent) {
+  ListenSubscription listenOnce(ValueHandler<E> onEvent) {
     ListenSubscription listenSubscription;
 
     listenSubscription = listen((data) {

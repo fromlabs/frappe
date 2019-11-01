@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:collection';
+import 'package:frappe/frappe.dart';
 import 'package:meta/meta.dart';
 
 import 'package:frappe/src/reference.dart';
 
+const String transactionZoneParameter = 'transaction';
+
 int _nodeId = 0;
 final Set<Node> _globalTargetNodes = Set.identity();
 final Set<Node> _globalSourceNodes = Set.identity();
-const String transactionZoneParameter = 'transaction';
 
 void assertAllNodesUnlinked() {
   if (_globalSourceNodes.isNotEmpty || _globalTargetNodes.isNotEmpty) {
@@ -17,6 +19,10 @@ void assertAllNodesUnlinked() {
     throw AssertionError('Not all nodes unlinked');
   }
 }
+
+typedef TransactionRunner<T> = T Function(Transaction transaction);
+typedef NodeEvaluator<S> = NodeEvaluation<S> Function(
+    Map<dynamic, NodeEvaluation> inputs);
 
 enum TransactionPhase { OPENED, EVALUATION, COMMIT, PUBLISH, CLOSED }
 
@@ -71,10 +77,10 @@ class Transaction {
         : null;
   }
 
-  static T runRequired<T>(T Function(Transaction) runner) =>
+  static T runRequired<T>(TransactionRunner<T> runner) =>
       runner(requiredTransaction);
 
-  static T run<T>(T Function(Transaction) runner) {
+  static T run<T>(TransactionRunner<T> runner) {
     if (isInTransaction) {
       return runner(currentTransaction);
     } else {
@@ -243,12 +249,11 @@ abstract class Node<S> extends Referenceable {
 
   final String _debugLabel;
 
-  NodeEvaluation<S> Function(Map<dynamic, NodeEvaluation> inputs)
-      evaluateHandler;
+  NodeEvaluator<S> evaluateHandler;
 
-  void Function(S) commitHandler;
+  ValueHandler<S> commitHandler;
 
-  void Function(S) publishHandler;
+  ValueHandler<S> publishHandler;
 
   final Map<dynamic, HostedReference<Node>> _sourceReferences = Map.identity();
 
@@ -259,11 +264,9 @@ abstract class Node<S> extends Referenceable {
   Node({
     String debugLabel,
     EvaluationType evaluationType,
-    @required
-        NodeEvaluation<S> Function(Map<dynamic, NodeEvaluation> inputs)
-            evaluateHandler,
-    void Function(S) commitHandler,
-    void Function(S) publishHandler,
+    @required NodeEvaluator<S> evaluateHandler,
+    ValueHandler<S> commitHandler,
+    ValueHandler<S> publishHandler,
   })  : _debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
         _evaluationType = evaluationType,
         this.evaluateHandler = evaluateHandler,
@@ -359,10 +362,9 @@ class IndexedNode<S> extends Node<S> {
   IndexedNode({
     String debugLabel,
     EvaluationType evaluationType = EvaluationType.ALL_INPUTS,
-    NodeEvaluation<S> Function(Map<dynamic, NodeEvaluation> inputs)
-        evaluateHandler,
-    void Function(S) commitHandler,
-    void Function(S) publishHandler,
+    NodeEvaluator<S> evaluateHandler,
+    ValueHandler<S> commitHandler,
+    ValueHandler<S> publishHandler,
   }) : super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
@@ -395,10 +397,9 @@ class NamedNode<S> extends Node<S> {
   NamedNode({
     String debugLabel,
     EvaluationType evaluationType = EvaluationType.ALL_INPUTS,
-    NodeEvaluation<S> Function(Map<dynamic, NodeEvaluation> inputs)
-        evaluateHandler,
-    void Function(S) commitHandler,
-    void Function(S) publishHandler,
+    NodeEvaluator<S> evaluateHandler,
+    ValueHandler<S> commitHandler,
+    ValueHandler<S> publishHandler,
   }) : super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,

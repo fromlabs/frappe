@@ -15,7 +15,7 @@ ValueState<V> createValueState<V>(
     ValueState._(initLazyValue, stream);
 
 class LazyValue<V> {
-  final V Function() _provider;
+  final ValueProvider<V> _provider;
   bool hasValue = false;
   V _value;
 
@@ -61,7 +61,7 @@ class OptionalLazyValue<V> extends LazyValue<Optional<V>> {
 
   OptionalLazyValue.empty() : super(Optional.empty());
 
-  OptionalLazyValue.provide(Optional<V> Function() provider)
+  OptionalLazyValue.provide(ValueProvider<Optional<V>> provider)
       : super.provide(provider);
 }
 
@@ -280,14 +280,13 @@ class ValueState<V> {
             (iterator..moveNext()).current);
       });
 
-  ListenSubscription listen(OnDataHandler<V> onValue) =>
+  ListenSubscription listen(ValueHandler<V> onValue) =>
       Transaction.run((transaction) => toValues().listen(onValue));
 
-  ValueState<VR> switchMapState<VR>(ValueState<VR> Function(V value) mapper) =>
+  ValueState<VR> switchMapState<VR>(Mapper<V, ValueState<VR>> mapper) =>
       ValueState.switchState<VR>(map<ValueState<VR>>(mapper));
 
-  EventStream<ER> switchMapStream<ER>(
-          EventStream<ER> Function(V value) mapper) =>
+  EventStream<ER> switchMapStream<ER>(Mapper<V, EventStream<ER>> mapper) =>
       ValueState.switchStream<ER>(map<EventStream<ER>>(mapper));
 
   Node<V> get _node => getEventStreamNode(_stream);

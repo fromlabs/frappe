@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:frappe/src/node.dart';
 import 'package:frappe/src/reference.dart';
 import 'package:test/test.dart';
@@ -247,6 +249,9 @@ void main() {
     Reference<IndexedNode<int>> merge1Ref;
     Reference<IndexedNode<int>> listenRef;
 
+    final commits = Queue<int>();
+    final publishs = Queue<int>();
+
     Transaction.run((tx) {
       final input1 = tx.node(IndexedNode<int>(debugLabel: 'INPUT1'));
       final input2 = tx.node(IndexedNode<int>(debugLabel: 'INPUT2'));
@@ -301,8 +306,8 @@ void main() {
       final listen = tx.node(IndexedNode<int>(
         debugLabel: 'LISTEN',
         evaluateHandler: (inputs) => inputs[0],
-        commitHandler: (value) => print('commit: $value'),
-        publishHandler: (value) => print('publish: $value'),
+        commitHandler: commits.add,
+        publishHandler: publishs.add,
       ))
         ..link(distinct);
 
@@ -313,30 +318,52 @@ void main() {
       listenRef = Reference(listen);
     });
 
+    expect(commits, isEmpty);
+    expect(publishs, isEmpty);
+
     Transaction.run((tx) {
       tx.setValue(input1Ref.value, 1);
       tx.setValue(input2Ref.value, 1);
     });
 
-    Transaction.run((tx) {
-      tx.setValue(input1Ref.value, 1);
-      tx.setValue(input2Ref.value, 2);
-    });
+    expect(commits, isNotEmpty);
+    expect(commits.removeLast(), equals(9));
+    expect(commits, isEmpty);
+    expect(publishs, isNotEmpty);
+    expect(publishs.removeLast(), equals(9));
+    expect(publishs, isEmpty);
 
     Transaction.run((tx) {
       tx.setValue(input1Ref.value, 1);
       tx.setValue(input2Ref.value, 2);
     });
-/*
+
+    expect(commits, isNotEmpty);
+    expect(commits.removeLast(), equals(18));
+    expect(commits, isEmpty);
+    expect(publishs, isNotEmpty);
+    expect(publishs.removeLast(), equals(18));
+    expect(publishs, isEmpty);
+
     Transaction.run((tx) {
-      tx.setEvaluation(input1Ref.value, 1);      
-      if (!tx.isEvaluated(input1Ref.value)) {
-        tx.setEvaluation(input1Ref.value, 2);
-      } else {
-        throw UnsupportedError('Node already with a value');
-      }
+      tx.setValue(input1Ref.value, 1);
+      tx.setValue(input2Ref.value, 2);
     });
-*/
+
+    expect(commits, isEmpty);
+    expect(publishs, isEmpty);
+
+    expect(
+        () => Transaction.run((tx) {
+              tx.setValue(input1Ref.value, 1);
+              if (!tx.hasValue(input1Ref.value)) {
+                tx.setValue(input1Ref.value, 2);
+              } else {
+                throw UnsupportedError('Node already with a value');
+              }
+            }),
+        throwsUnsupportedError);
+
     input1Ref.dispose();
     input2Ref.dispose();
     input3Ref.dispose();

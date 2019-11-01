@@ -26,6 +26,15 @@ class ValueStateSinkDisposable implements Disposable {
   void dispose() => _valueStateSink?.close();
 }
 
+class ListenCancelerDisposable implements Disposable {
+  final ListenSubscription _listenCanceler;
+
+  ListenCancelerDisposable(this._listenCanceler);
+
+  @override
+  void dispose() => _listenCanceler?.cancel();
+}
+
 class StreamSubscriptionDisposable implements Disposable {
   final StreamSubscription _streamSubscription;
 
@@ -42,13 +51,4 @@ class StreamControllerDisposable implements Disposable {
 
   @override
   FutureOr<void> dispose() => _streamController?.close();
-}
-
-class ListenCancelerDisposable implements Disposable {
-  final ListenSubscription _listenCanceler;
-
-  ListenCancelerDisposable(this._listenCanceler);
-
-  @override
-  void dispose() => _listenCanceler?.cancel();
 }
