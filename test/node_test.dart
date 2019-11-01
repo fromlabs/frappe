@@ -224,7 +224,7 @@ void main() {
       final node1 = tx.node(IndexedNode<int>(debugLabel: 'INPUT'));
       final node2 = tx.node(IndexedNode<int>(
           debugLabel: 'DUPLIFY',
-          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0])));
+          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0].value)));
 
       node2.link(node1);
 
@@ -254,36 +254,34 @@ void main() {
 
       final node21 = tx.node(IndexedNode<int>(
           debugLabel: 'DUPLIFY1',
-          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0])))
+          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0].value)))
         ..link(input1);
 
       final node22 = tx.node(IndexedNode<int>(
           debugLabel: 'TRIPLIFY2',
-          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0])))
+          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0].value)))
         ..link(input2);
 
       final merge2 = tx.node(IndexedNode<int>(
         debugLabel: 'MERGE2',
-        canEvaluatePartially: true,
-        evaluateHandler: (inputs) => inputs.isNotEmpty
-            ? NodeEvaluation(inputs.containsKey(0) ? inputs[0] : inputs[1])
-            : NodeEvaluation.not(),
+        evaluationType: EvaluationType.ALMOST_ONE_INPUT,
+        evaluateHandler: (inputs) =>
+            inputs[0].isEvaluated ? inputs[0] : inputs[1],
       ))
         ..link(input3)
         ..link(node22);
 
       final node32 = tx.node(IndexedNode<int>(
           debugLabel: 'TRIPLIFY3',
-          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0])))
+          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0].value)))
         ..link(merge2);
 
       int merge1Value = 1;
       final merge1 = tx.node(IndexedNode<int>(
         debugLabel: 'MERGE1',
-        canEvaluatePartially: true,
-        evaluateHandler: (inputs) => inputs.isNotEmpty
-            ? NodeEvaluation(inputs.containsKey(0) ? inputs[0] : inputs[1])
-            : NodeEvaluation.not(),
+        evaluationType: EvaluationType.ALMOST_ONE_INPUT,
+        evaluateHandler: (inputs) =>
+            inputs[0].isEvaluated ? inputs[0] : inputs[1],
         commitHandler: (value) => merge1Value = value,
       ))
         ..link(node32)
@@ -293,8 +291,8 @@ void main() {
       final distinct = tx.node(IndexedNode<int>(
         debugLabel: 'DISTINCT',
         evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
-                inputs[0] != previousEvaluation.value
-            ? NodeEvaluation(inputs[0])
+                inputs[0].value != previousEvaluation.value
+            ? inputs[0]
             : NodeEvaluation.not(),
         commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
       ))
@@ -302,7 +300,7 @@ void main() {
 
       final listen = tx.node(IndexedNode<int>(
         debugLabel: 'LISTEN',
-        evaluateHandler: (inputs) => NodeEvaluation(inputs[0]),
+        evaluateHandler: (inputs) => inputs[0],
         commitHandler: (value) => print('commit: $value'),
         publishHandler: (value) => print('publish: $value'),
       ))
