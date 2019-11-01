@@ -5,9 +5,9 @@ ValueState<double> accumulate(
   EventStream<int> deltaStream,
   ValueState<double> calibrationState,
 ) {
-  final totalStateRef = ValueStateReference();
+  final totalStateRef = ValueStateLink();
 
-  totalStateRef.link(clearAccumulatorStream
+  totalStateRef.connect(clearAccumulatorStream
       .mapTo(0)
       .orElse(deltaStream.snapshot(
           totalStateRef.state, (delta, total) => total + delta))

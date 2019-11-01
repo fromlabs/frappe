@@ -1,7 +1,5 @@
 import 'package:tuple/tuple.dart';
 
-// TODO aggiungere typedef di reference e node
-
 typedef Runner<T> = T Function();
 typedef Accumulator<V, S> = S Function(V value, S state);
 typedef Collector<E, S, ER> = Tuple2<ER, S> Function(E data, S state);

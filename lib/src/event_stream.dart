@@ -60,41 +60,42 @@ class OptionalEventStreamSink<E> extends EventStreamSink<Optional<E>> {
   void sendOptionalOf(E event) => send(Optional<E>.of(event));
 }
 
-class EventStreamReference<E> {
+class EventStreamLink<E> {
   final EventStream<E> stream;
 
-  factory EventStreamReference() => EventStreamReference._(EventStream<E>._(
-      IndexedNode<E>(evaluateHandler: _defaultEvaluateHandler)));
+  factory EventStreamLink() => Transaction.runRequired((transaction) =>
+      EventStreamLink._(EventStream<E>._(transaction
+          .node(IndexedNode<E>(evaluateHandler: _defaultEvaluateHandler)))));
 
-  EventStreamReference._(this.stream);
+  EventStreamLink._(this.stream);
 
   bool get isLinked => _node.isLinked(0);
 
-  void link(EventStream<E> stream) {
-    if (isLinked) {
-      throw StateError("Reference already linked");
-    }
+  void connect(EventStream<E> stream) => Transaction.runRequired((_) {
+        if (isLinked) {
+          throw StateError("Reference already linked");
+        }
 
-    _node.link(stream._node);
-  }
+        _node.link(stream._node);
+      });
 
   IndexedNode<E> get _node => stream._node;
 }
 
-class OptionalEventStreamReference<E>
-    extends EventStreamReference<Optional<E>> {
-  factory OptionalEventStreamReference() =>
-      OptionalEventStreamReference._(OptionalEventStream<E>._(
-          IndexedNode<Optional<E>>(evaluateHandler: _defaultEvaluateHandler)));
+class OptionalEventStreamLink<E> extends EventStreamLink<Optional<E>> {
+  factory OptionalEventStreamLink() =>
+      Transaction.runRequired((transaction) => OptionalEventStreamLink._(
+          OptionalEventStream<E>._(transaction.node(IndexedNode<Optional<E>>(
+              evaluateHandler: _defaultEvaluateHandler)))));
 
-  OptionalEventStreamReference._(OptionalEventStream<E> stream)
-      : super._(stream);
+  OptionalEventStreamLink._(OptionalEventStream<E> stream) : super._(stream);
 
   @override
   OptionalEventStream<E> get stream => super.stream;
 
   @override
-  void link(covariant OptionalEventStream<E> stream) => super.link(stream);
+  void connect(covariant OptionalEventStream<E> stream) =>
+      super.connect(stream);
 }
 
 class EventStream<E> {
@@ -109,7 +110,7 @@ class EventStream<E> {
   EventStream._(this._node, [Merger<E> merger])
       : _merger = merger ?? _defaultMergerFactory<E>();
 
-  // TODO implementare
+  // TODO implementare merges
   static EventStream<E> merges<E>(Iterable<EventStream<E>> streams,
           [Merger<E> merger]) =>
       throw UnimplementedError();
@@ -126,10 +127,10 @@ class EventStream<E> {
 
   ValueState<E> toState(E initValue) => toStateLazy(LazyValue(initValue));
 
-  ValueState<E> toStateLazy(LazyValue<E> initLazyValue) =>
-      Transaction.runRequired((_) => createValueState(initLazyValue, this));
+  ValueState<E> toStateLazy(LazyValue<E> lazyInitValue) =>
+      Transaction.runRequired((_) => createValueState(lazyInitValue, this));
 
-  // TODO implementare
+  // TODO implementare once
   EventStream<E> once() => throw UnimplementedError();
 
   EventStream<E> distinct([Equalizer<E> distinctEquals]) =>
@@ -180,27 +181,35 @@ class EventStream<E> {
       });
 
   ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) {
-    final reference = ValueStateReference<V>();
-    reference.link(snapshot(reference.state, accumulator).toState(initValue));
+    final reference = ValueStateLink<V>();
+    reference
+        .connect(snapshot(reference.state, accumulator).toState(initValue));
     return reference.state;
   }
 
-  // TODO implementare
   ValueState<V> accumulateLazy<V>(
-          LazyValue<V> lazyInitValue, Accumulator<E, V> accumulator) =>
-      throw UnimplementedError();
+      LazyValue<V> lazyInitValue, Accumulator<E, V> accumulator) {
+    final reference = ValueStateLink<V>();
+    reference.connect(
+        snapshot(reference.state, accumulator).toStateLazy(lazyInitValue));
+    return reference.state;
+  }
 
   EventStream<ER> collect<ER, V>(V initValue, Collector<E, V, ER> collector) {
-    final reference = EventStreamReference<V>();
+    final reference = EventStreamLink<V>();
     final stream = snapshot(reference.stream.toState(initValue), collector);
-    reference.link(stream.map((tuple) => tuple.item2));
+    reference.connect(stream.map((tuple) => tuple.item2));
     return stream.map((tuple) => tuple.item1);
   }
 
-  // TODO implementare
   EventStream<ER> collectLazy<ER, V>(
-          LazyValue<V> lazyInitValue, Collector<E, V, ER> collector) =>
-      throw UnimplementedError();
+      LazyValue<V> lazyInitValue, Collector<E, V, ER> collector) {
+    final reference = EventStreamLink<V>();
+    final stream =
+        snapshot(reference.stream.toStateLazy(lazyInitValue), collector);
+    reference.connect(stream.map((tuple) => tuple.item2));
+    return stream.map((tuple) => tuple.item1);
+  }
 
   EventStream<E> gate(ValueState<bool> conditionState) => snapshot(
           conditionState,
@@ -214,10 +223,9 @@ class EventStream<E> {
   EventStream<E> orElses(Iterable<EventStream<E>> streams) =>
       merges<E>([this, ...streams]);
 
-  // TODO implementare
   EventStream<ER> snapshot<V2, ER>(
           ValueState<V2> fromState, Combiner2<E, V2, ER> combiner) =>
-      throw UnimplementedError();
+      map((event) => combiner(event, fromState.current()));
 
   ListenSubscription listen(ValueHandler<E> onEvent) =>
       Transaction.run((transaction) {

@@ -55,8 +55,8 @@ class FrpParadigm implements Paradigm {
 
   FrpParadigm(Document initDocument, DocumentListener documentListener) {
     // TODO sistemare ValueStateReference(initDocument);
-    ValueStateReference<Document> documentStateReference =
-        ValueStateReference();
+    ValueStateLink<Document> documentStateReference =
+        ValueStateLink();
 
     EventStream<Document> idleStream = EventStream.never();
 

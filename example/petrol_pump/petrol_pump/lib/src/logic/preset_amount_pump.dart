@@ -12,7 +12,7 @@ import '../petrol_pump.dart';
 class PresetAmountPump extends BasePump {
   @override
   Outputs create(Inputs inputs) {
-    final startStreamRef = EventStreamReference<Fuel>();
+    final startStreamRef = EventStreamLink<Fuel>();
 
     final fill = Fill(
       clearAccumulatorStream: inputs.clearSaleStream,
@@ -34,9 +34,9 @@ class PresetAmountPump extends BasePump {
       clearSaleStream: inputs.clearSaleStream,
     );
 
-    startStreamRef.link(notifyPointOfSale.startStream);
+    startStreamRef.connect(notifyPointOfSale.startStream);
 
-    final isKeypadActiveStateRef = ValueStateReference();
+    final isKeypadActiveStateRef = ValueStateLink();
 
     final keypad = Keypad(
       keypadStream: inputs.keypadStream,
@@ -54,7 +54,7 @@ class PresetAmountPump extends BasePump {
       // isFillActiveState: isFillActiveState,
     );
 
-    isKeypadActiveStateRef.link(preset.isKeypadActiveState);
+    isKeypadActiveStateRef.connect(preset.isKeypadActiveState);
 
     final beepStream = notifyPointOfSale.beepStream.orElse(keypad.beepStream);
 

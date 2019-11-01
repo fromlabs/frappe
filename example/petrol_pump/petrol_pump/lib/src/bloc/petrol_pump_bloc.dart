@@ -50,7 +50,7 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
 
   final EventStreamSink<int> _toggleNozzleStreamSink = EventStreamSink();
 
-  final EventStreamReference<int> _fuelPulsesStreamRef = EventStreamReference();
+  final EventStreamLink<int> _fuelPulsesStreamRef = EventStreamLink();
 
   final EventStreamSink<Unit> _clearSaleStreamSink = EventStreamSink();
 
@@ -90,9 +90,9 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
     _nozzleStates = BuiltList.of(range(1, 4).map((number) {
       final initialState = UpDown.down;
 
-      final nozzleStateRef = ValueStateReference();
+      final nozzleStateRef = ValueStateLink();
 
-      nozzleStateRef.link(_toggleNozzleStreamSink.stream
+      nozzleStateRef.connect(_toggleNozzleStreamSink.stream
           .where((nozzle) => nozzle == number)
           .snapshot(nozzleStateRef.state,
               (_, nozzle) => nozzle == UpDown.up ? UpDown.down : UpDown.up)
@@ -156,7 +156,7 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
 
     _pumpEngineSimulator =
         PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
-    _fuelPulsesStreamRef.link(_pumpEngineSimulator.fuelPulsesStream);
+    _fuelPulsesStreamRef.connect(_pumpEngineSimulator.fuelPulsesStream);
 
     _priceStates = BuiltList.of([
       outputs.priceLcd1State.map(fromLcdMapper).asOptional<double>(),

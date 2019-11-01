@@ -18,7 +18,7 @@ Future<void> main() async {
   final deltaStream = incrementStream.orElse(decrementStream);
 
   // value state reference (for cyclic dependencies)
-  final totalStateReference = ValueStateReference<int>();
+  final totalStateReference = ValueStateLink<int>();
 
   // value state
   final totalState = totalStateReference.state;
@@ -31,7 +31,7 @@ Future<void> main() async {
   final updatedTotalState = totalUpdateStream.toState(0);
 
   // lazy reference link
-  totalStateReference.link(updatedTotalState);
+  totalStateReference.connect(updatedTotalState);
 
   // adding listeners
   final subscription = plusStream

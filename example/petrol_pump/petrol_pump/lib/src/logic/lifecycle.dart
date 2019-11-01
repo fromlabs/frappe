@@ -32,7 +32,7 @@ class Lifecycle extends BaseObserver {
     @required EventStream<UpDown> nozzle2Stream,
     @required EventStream<UpDown> nozzle3Stream,
   }) {
-    final fillActiveStateRef = OptionalValueStateReference<Fuel>();
+    final fillActiveStateRef = OptionalValueStateLink<Fuel>();
 
     final startStream = _whenLifted(nozzle1Stream, Fuel.one)
         .orElses([
@@ -53,7 +53,7 @@ class Lifecycle extends BaseObserver {
       _whenSetDown(nozzle3Stream, Fuel.three, fillActiveStateRef.state)
     ]);
 
-    fillActiveStateRef.link(endStream
+    fillActiveStateRef.connect(endStream
         .mapToOptionalEmpty<Fuel>()
         .orElse(startStream.mapToOptionalOf())
         .toState(Optional.empty())

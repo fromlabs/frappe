@@ -1,7 +1,5 @@
 import 'package:meta/meta.dart';
 
-// TODO in generale rivedere i nomi
-
 final Map<Referenceable, Set<Reference>> _globalReferences = Map.identity();
 
 void assertAllUnreferenced() {

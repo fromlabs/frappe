@@ -6,8 +6,8 @@ export 'src/event_stream.dart'
     show
         EventStream,
         OptionalEventStream,
-        EventStreamReference,
-        OptionalEventStreamReference,
+        EventStreamLink,
+        OptionalEventStreamLink,
         EventStreamSink,
         OptionalEventStreamSink;
 export 'src/listen_subscription.dart';
@@ -19,5 +19,5 @@ export 'src/value_state.dart'
         OptionalValueState,
         ValueStateSink,
         OptionalValueStateSink,
-        ValueStateReference,
-        OptionalValueStateReference;
+        ValueStateLink,
+        OptionalValueStateLink;

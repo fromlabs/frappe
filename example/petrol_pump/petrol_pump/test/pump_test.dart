@@ -6,8 +6,8 @@ import 'package:test/test.dart';
 
 void main() {
   group('Simple pump', () {
-    EventStreamReference<int> fuelPulsesStreamRef;
-    EventStreamReference<Unit> clearSaleStreamRef;
+    EventStreamLink<int> fuelPulsesStreamRef;
+    EventStreamLink<Unit> clearSaleStreamRef;
     EventStreamSink<UpDown> nozzle1StreamSink;
     EventStreamSink<UpDown> nozzle2StreamSink;
     EventStreamSink<UpDown> nozzle3StreamSink;
@@ -49,8 +49,8 @@ void main() {
     }
 
     setUp(() {
-      fuelPulsesStreamRef = EventStreamReference<int>();
-      clearSaleStreamRef = EventStreamReference<Unit>();
+      fuelPulsesStreamRef = EventStreamLink<int>();
+      clearSaleStreamRef = EventStreamLink<Unit>();
       nozzle1StreamSink = EventStreamSink<UpDown>();
       nozzle2StreamSink = EventStreamSink<UpDown>();
       nozzle3StreamSink = EventStreamSink<UpDown>();
@@ -76,11 +76,11 @@ void main() {
 
       pumpEngineSimulator =
           PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
-      fuelPulsesStreamRef.link(pumpEngineSimulator.fuelPulsesStream);
+      fuelPulsesStreamRef.connect(pumpEngineSimulator.fuelPulsesStream);
 
       posSimulator =
           PosSimulatorImpl(saleCompleteStream: outputs.saleCompleteStream);
-      clearSaleStreamRef.link(posSimulator.clearSaleStream);
+      clearSaleStreamRef.connect(posSimulator.clearSaleStream);
     });
 
     tearDown(() async {
@@ -158,8 +158,8 @@ void main() {
   });
 
   group('Switch pump', () {
-    EventStreamReference<int> fuelPulsesStreamRef;
-    EventStreamReference<Unit> clearSaleStreamRef;
+    EventStreamLink<int> fuelPulsesStreamRef;
+    EventStreamLink<Unit> clearSaleStreamRef;
     EventStreamSink<UpDown> nozzle1StreamSink;
     EventStreamSink<UpDown> nozzle2StreamSink;
     EventStreamSink<UpDown> nozzle3StreamSink;
@@ -204,8 +204,8 @@ void main() {
     }
 
     setUp(() {
-      fuelPulsesStreamRef = EventStreamReference<int>();
-      clearSaleStreamRef = EventStreamReference<Unit>();
+      fuelPulsesStreamRef = EventStreamLink<int>();
+      clearSaleStreamRef = EventStreamLink<Unit>();
       nozzle1StreamSink = EventStreamSink<UpDown>();
       nozzle2StreamSink = EventStreamSink<UpDown>();
       nozzle3StreamSink = EventStreamSink<UpDown>();
@@ -240,11 +240,11 @@ void main() {
 
       pumpEngineSimulator =
           PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
-      fuelPulsesStreamRef.link(pumpEngineSimulator.fuelPulsesStream);
+      fuelPulsesStreamRef.connect(pumpEngineSimulator.fuelPulsesStream);
 
       posSimulator =
           PosSimulatorImpl(saleCompleteStream: outputs.saleCompleteStream);
-      clearSaleStreamRef.link(posSimulator.clearSaleStream);
+      clearSaleStreamRef.connect(posSimulator.clearSaleStream);
     });
 
     tearDown(() async {

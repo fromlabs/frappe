@@ -10,7 +10,7 @@ import '../petrol_pump.dart';
 class ClearSalePump extends BasePump {
   @override
   Outputs create(Inputs inputs) {
-    final startStreamRef = EventStreamReference<Fuel>();
+    final startStreamRef = EventStreamLink<Fuel>();
 
     final fill = Fill(
       clearAccumulatorStream: inputs.clearSaleStream,
@@ -32,7 +32,7 @@ class ClearSalePump extends BasePump {
       clearSaleStream: inputs.clearSaleStream,
     );
 
-    startStreamRef.link(notifyPointOfSale.startStream);
+    startStreamRef.connect(notifyPointOfSale.startStream);
 
     return Outputs.fromDefault(
       (builder) => builder

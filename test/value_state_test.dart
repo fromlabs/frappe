@@ -246,6 +246,36 @@ void main() {
 
       sink.close();
     });
+
+    test('Test 6', () {
+      final sink = ValueStateSink<int>(1);
+
+      final events1 = Queue<int>();
+
+      final subscription1 = runTransaction(() {
+        final link = ValueStateLink<int>();
+
+        link.connect(sink.state);
+
+        return sink.state.map((value) => 2 * value).listen((event) {
+          events1.addLast(event);
+        });
+      });
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+
+      sink.send(2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(4));
+      expect(events1, isEmpty);
+
+      subscription1.cancel();
+
+      sink.close();
+    });
   });
 
   group('OptionalValueState', () {

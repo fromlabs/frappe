@@ -11,8 +11,8 @@ NodeEvaluation<V> _defaultEvaluateHandler<V>(
     inputs[0];
 
 ValueState<V> createValueState<V>(
-        LazyValue<V> initLazyValue, EventStream<V> stream) =>
-    ValueState._(initLazyValue, stream);
+        LazyValue<V> lazyInitValue, EventStream<V> stream) =>
+    ValueState._(lazyInitValue, stream);
 
 class LazyValue<V> {
   final ValueProvider<V> _provider;
@@ -73,11 +73,11 @@ class ValueStateSink<V> {
   factory ValueStateSink(V initValue, [Merger<V> merger]) =>
       ValueStateSink.lazy(LazyValue(initValue), merger);
 
-  factory ValueStateSink.lazy(LazyValue<V> initLazyValue, [Merger<V> merger]) =>
-      ValueStateSink<V>._(initLazyValue, EventStreamSink<V>(merger));
+  factory ValueStateSink.lazy(LazyValue<V> lazyInitValue, [Merger<V> merger]) =>
+      ValueStateSink<V>._(lazyInitValue, EventStreamSink<V>(merger));
 
-  ValueStateSink._(LazyValue<V> initLazyValue, this._eventStreamSink)
-      : this.state = ValueState._(initLazyValue, _eventStreamSink.stream);
+  ValueStateSink._(LazyValue<V> lazyInitValue, this._eventStreamSink)
+      : this.state = ValueState._(lazyInitValue, _eventStreamSink.stream);
 
   bool get isClosed => _eventStreamSink.isClosed;
 
@@ -91,10 +91,10 @@ class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
           [Merger<Optional<V>> merger]) =>
       OptionalValueStateSink.lazy(OptionalLazyValue(initValue), merger);
 
-  factory OptionalValueStateSink.lazy(OptionalLazyValue<V> initLazyValue,
+  factory OptionalValueStateSink.lazy(OptionalLazyValue<V> lazyInitValue,
           [Merger<Optional<V>> merger]) =>
       OptionalValueStateSink<V>._(
-          initLazyValue, OptionalEventStreamSink<V>(merger));
+          lazyInitValue, OptionalEventStreamSink<V>(merger));
 
   factory OptionalValueStateSink.empty([Merger<Optional<V>> merger]) =>
       OptionalValueStateSink(Optional.empty(), merger);
@@ -103,9 +103,9 @@ class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
           [Merger<Optional<V>> merger]) =>
       OptionalValueStateSink(Optional.of(initValue), merger);
 
-  OptionalValueStateSink._(OptionalLazyValue<V> initLazyValue,
+  OptionalValueStateSink._(OptionalLazyValue<V> lazyInitValue,
       OptionalEventStreamSink<V> eventStreamSink)
-      : super._(initLazyValue, eventStreamSink);
+      : super._(lazyInitValue, eventStreamSink);
 
   @override
   OptionalValueState<V> get state => super.state;
@@ -115,43 +115,44 @@ class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
   void sendOptionalOf(V value) => send(Optional<V>.of(value));
 }
 
-class ValueStateReference<V> {
+class ValueStateLink<V> {
   final ValueState<V> state;
 
-  factory ValueStateReference() => ValueStateReference._(ValueState<V>._(
-      LazyValue<V>.undefined(),
-      createEventStream<V>(
-          IndexedNode<V>(evaluateHandler: _defaultEvaluateHandler))));
+  factory ValueStateLink() =>
+      Transaction.runRequired((transaction) => ValueStateLink._(ValueState<V>._(
+          LazyValue<V>.undefined(),
+          createEventStream<V>(transaction.node(
+              IndexedNode<V>(evaluateHandler: _defaultEvaluateHandler))))));
 
-  ValueStateReference._(this.state);
+  ValueStateLink._(this.state);
 
   bool get isLinked => _node.isLinked(0);
 
-  void link(ValueState<V> state) {
-    if (isLinked) {
-      throw StateError("Reference already linked");
-    }
+  void connect(ValueState<V> state) => Transaction.runRequired((_) {
+        if (isLinked) {
+          throw StateError("Reference already linked");
+        }
 
-    _node.link(state._node);
-  }
+        _node.link(state._node);
+      });
 
   IndexedNode<V> get _node => state._node;
 }
 
-class OptionalValueStateReference<V> extends ValueStateReference<Optional<V>> {
-  factory OptionalValueStateReference() =>
-      OptionalValueStateReference._(OptionalValueState<V>._(
+class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
+  factory OptionalValueStateLink() => Transaction.runRequired((transaction) =>
+      OptionalValueStateLink._(OptionalValueState<V>._(
           OptionalLazyValue<V>.undefined(),
-          createOptionalEventStream(IndexedNode<Optional<V>>(
-              evaluateHandler: _defaultEvaluateHandler))));
+          createOptionalEventStream(transaction.node(IndexedNode<Optional<V>>(
+              evaluateHandler: _defaultEvaluateHandler))))));
 
-  OptionalValueStateReference._(OptionalValueState<V> state) : super._(state);
+  OptionalValueStateLink._(OptionalValueState<V> state) : super._(state);
 
   @override
   OptionalValueState<V> get state => super.state;
 
   @override
-  void link(covariant OptionalValueState<V> state) => super.link(state);
+  void connect(covariant OptionalValueState<V> state) => super.connect(state);
 }
 
 class ValueState<V> {
@@ -172,16 +173,16 @@ class ValueState<V> {
     };
   }
 
-  // TODO implementare
+  // TODO implementare combines
   static ValueState<VR> combines<VR>(
           Iterable<ValueState> states, Combiners<VR> combiner) =>
       throw UnimplementedError();
 
-  // TODO implementare
+  // TODO implementare switchState
   static ValueState<V> switchState<V>(ValueState<ValueState<V>> statesState) =>
       throw UnimplementedError();
 
-  // TODO implementare
+  // TODO implementare switchStream
   static EventStream<E> switchStream<E>(
           ValueState<EventStream<E>> streamsState) =>
       throw UnimplementedError();
@@ -302,8 +303,8 @@ class OptionalValueState<V> extends ValueState<Optional<V>> {
       : super.constant(Optional<V>.of(initValue));
 
   OptionalValueState._(
-      LazyValue<Optional<V>> initLazyValue, OptionalEventStream<V> stream)
-      : super._(initLazyValue, stream);
+      LazyValue<Optional<V>> lazyInitValue, OptionalEventStream<V> stream)
+      : super._(lazyInitValue, stream);
 
   @override
   OptionalEventStream<V> toValues() =>
