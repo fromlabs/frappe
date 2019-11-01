@@ -10,42 +10,60 @@ NodeEvaluation<V> _defaultEvaluateHandler<V>(
         Map<dynamic, NodeEvaluation> inputs) =>
     inputs[0];
 
+ValueState<V> createValueState<V>(
+        LazyValue<V> initLazyValue, EventStream<V> stream) =>
+    ValueState._(initLazyValue, stream);
+
 class LazyValue<V> {
   final V Function() _provider;
   bool hasValue = false;
   V _value;
 
-  LazyValue(this._provider);
-
-  LazyValue.undefined()
-      : _provider = (() => throw StateError('Lazy value undefined'));
-
-  LazyValue.value(V value)
+  LazyValue(V value)
       : _provider = null,
         hasValue = true,
         _value = value;
 
-  V get() {
-    if (hasValue) {
-      return _value;
-    } else {
-      return Transaction.run((transaction) {
-        _value = _provider();
-        hasValue = true;
-        return _value;
+  LazyValue.undefined()
+      : _provider = (() => throw StateError('Lazy value undefined'));
+
+  LazyValue.provide(this._provider);
+
+  OptionalLazyValue<VV> asOptional<VV>() => OptionalLazyValue.provide(() {
+        final value = get();
+        if (value is Optional<VV>) {
+          return value;
+        } else {
+          throw ArgumentError('Value is not optional');
+        }
       });
-    }
-  }
 
-  LazyValue<VR> map<VR>(Mapper<V, VR> mapper) => LazyValue(() => mapper(get()));
+  V get() => Transaction.runRequired((_) {
+        if (hasValue) {
+          return _value;
+        } else {
+          _value = _provider();
+          hasValue = true;
+          return _value;
+        }
+      });
+
+  LazyValue<VR> map<VR>(Mapper<V, VR> mapper) =>
+      LazyValue.provide(() => mapper(get()));
 }
 
-// TODO implementare LazyOptionalValue
-/*
-class LazyOptionalValue<V> extends LazyValue<Optional<V>> {
+class OptionalLazyValue<V> extends LazyValue<Optional<V>> {
+  OptionalLazyValue(Optional<V> value) : super(value);
 
+  OptionalLazyValue.undefined() : super.undefined();
+
+  OptionalLazyValue.of(V value) : super(Optional.of(value));
+
+  OptionalLazyValue.empty() : super(Optional.empty());
+
+  OptionalLazyValue.provide(Optional<V> Function() provider)
+      : super.provide(provider);
 }
-*/
 
 class ValueStateSink<V> {
   final ValueState<V> state;
@@ -53,7 +71,7 @@ class ValueStateSink<V> {
   final EventStreamSink<V> _eventStreamSink;
 
   factory ValueStateSink(V initValue, [Merger<V> merger]) =>
-      ValueStateSink.lazy(LazyValue.value(initValue), merger);
+      ValueStateSink.lazy(LazyValue(initValue), merger);
 
   factory ValueStateSink.lazy(LazyValue<V> initLazyValue, [Merger<V> merger]) =>
       ValueStateSink<V>._(initLazyValue, EventStreamSink<V>(merger));
@@ -71,9 +89,9 @@ class ValueStateSink<V> {
 class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
   factory OptionalValueStateSink(Optional<V> initValue,
           [Merger<Optional<V>> merger]) =>
-      OptionalValueStateSink.lazy(LazyValue.value(initValue), merger);
+      OptionalValueStateSink.lazy(OptionalLazyValue(initValue), merger);
 
-  factory OptionalValueStateSink.lazy(LazyValue<Optional<V>> initLazyValue,
+  factory OptionalValueStateSink.lazy(OptionalLazyValue<V> initLazyValue,
           [Merger<Optional<V>> merger]) =>
       OptionalValueStateSink<V>._(
           initLazyValue, OptionalEventStreamSink<V>(merger));
@@ -85,7 +103,7 @@ class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
           [Merger<Optional<V>> merger]) =>
       OptionalValueStateSink(Optional.of(initValue), merger);
 
-  OptionalValueStateSink._(LazyValue<Optional<V>> initLazyValue,
+  OptionalValueStateSink._(OptionalLazyValue<V> initLazyValue,
       OptionalEventStreamSink<V> eventStreamSink)
       : super._(initLazyValue, eventStreamSink);
 
@@ -123,7 +141,7 @@ class ValueStateReference<V> {
 class OptionalValueStateReference<V> extends ValueStateReference<Optional<V>> {
   factory OptionalValueStateReference() =>
       OptionalValueStateReference._(OptionalValueState<V>._(
-          LazyValue<Optional<V>>.undefined(),
+          OptionalLazyValue<V>.undefined(),
           createOptionalEventStream(IndexedNode<Optional<V>>(
               evaluateHandler: _defaultEvaluateHandler))));
 
@@ -142,16 +160,15 @@ class ValueState<V> {
   final EventStream<V> _stream;
 
   ValueState.constant(V initValue)
-      : this.lazyConstant(LazyValue.value(initValue));
-
-  ValueState.lazyConstant(LazyValue<V> initLazyValue)
-      : this._(initLazyValue, EventStream<V>.never());
+      : this._(LazyValue(initValue), EventStream<V>.never());
 
   ValueState._(this._currentLazyValue, this._stream) {
-    _node.commitHandler = (value) {
-      print('commit: $value');
+    final _superCommitHandler = _node.commitHandler;
 
-      _currentLazyValue = LazyValue.value(value);
+    _node.commitHandler = (value) {
+      _superCommitHandler(value);
+
+      _currentLazyValue = LazyValue(value);
     };
   }
 
@@ -168,58 +185,41 @@ class ValueState<V> {
   static EventStream<E> switchStream<E>(
           ValueState<EventStream<E>> streamsState) =>
       throw UnimplementedError();
-  /*
-      // TODO utilizzato dai lift di sodium
-      static ValueState<B> stateApply<A, B>(
-              ValueState<Mapper<A, B>> mapperState, ValueState<A> state) =>
-          throw UnimplementedError();
-    */
 
-  // TODO capire se utilizzare la transazione
+/*
+  // TODO utilizzato dai lift di sodium
+  static ValueState<B> stateApply<A, B>(
+          ValueState<Mapper<A, B>> mapperState, ValueState<A> state) =>
+      throw UnimplementedError();
+*/
+
   V current() => Transaction.run((transaction) => currentLazy().get());
 
   LazyValue<V> currentLazy() => _currentLazyValue;
 
-  // TODO implementare
-  OptionalValueState<VV> asOptional<VV>() {
-/*    
-    final transaction = Transaction.requiredTransaction;
+  OptionalValueState<VV> asOptional<VV>() =>
+      Transaction.runRequired((_) => OptionalValueState._(
+          currentLazy().asOptional<VV>(), _stream.asOptional()));
 
-    final targetNode = transaction.node(
-        IndexedNode<Optional<EE>>(evaluateHandler: _defaultEvaluateHandler));
+  EventStream<V> toValues() => Transaction.runRequired((transaction) {
+        final targetNode = transaction.node(IndexedNode<V>(
+            evaluationType: EvaluationType.FIRST_EVALUATION,
+            evaluateHandler: (inputs) =>
+                inputs[0].isEvaluated ? inputs[0] : NodeEvaluation(current())));
 
-    targetNode.link(_node);
+        targetNode.link(_node);
 
-    return OptionalValueState._(targetNode);
-*/
-
-    throw UnimplementedError();
-  }
-
-  EventStream<V> toValues() {
-    final transaction = Transaction.requiredTransaction;
-
-    final targetNode = transaction.node(IndexedNode<V>(
-        evaluationType: EvaluationType.FIRST_EVALUATION,
-        evaluateHandler: (inputs) =>
-            inputs[0].isEvaluated ? inputs[0] : NodeEvaluation(current())));
-
-    targetNode.link(_node);
-
-    return createEventStream(targetNode);
-  }
+        return createEventStream(targetNode);
+      });
 
   EventStream<V> toUpdates() => _stream;
 
-  // TODO implementare
   ValueState<V> distinct([Equalizer<V> distinctEquals]) =>
-      throw UnimplementedError();
+      Transaction.runRequired((_) =>
+          ValueState._(_currentLazyValue, _stream.distinct(distinctEquals)));
 
-  ValueState<VR> map<VR>(Mapper<V, VR> mapper) {
-    Transaction.requiredTransaction;
-
-    return ValueState._(_currentLazyValue.map(mapper), _stream.map(mapper));
-  }
+  ValueState<VR> map<VR>(Mapper<V, VR> mapper) => Transaction.runRequired(
+      (_) => ValueState._(_currentLazyValue.map(mapper), _stream.map(mapper)));
 
   OptionalValueState<V> mapToOptionalOf() => runTransaction(
       () => map<Optional<V>>((value) => Optional<V>.of(value)).asOptional<V>());
@@ -313,6 +313,9 @@ class OptionalValueState<V> extends ValueState<Optional<V>> {
   @override
   OptionalEventStream<V> toUpdates() =>
       runTransaction(() => super.toUpdates().asOptional<V>());
+
+  @override
+  OptionalLazyValue<V> currentLazy() => super.currentLazy();
 
   ValueState<bool> mapIsEmptyOptional() => map((value) => !value.isPresent);
 

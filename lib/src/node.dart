@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'package:meta/meta.dart';
 
 import 'package:frappe/src/reference.dart';
 
@@ -36,9 +37,19 @@ class NodeEvaluation<S> {
 
   S get value => isEvaluated ? _value : throw StateError('Not evaluated');
 
-  // TODO implementare equals
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) {
+      return true;
+    } else {
+      return other is NodeEvaluation<S> &&
+          isEvaluated == other.isEvaluated &&
+          _value == other._value;
+    }
+  }
 
-  // TODO implementare hashcode
+  @override
+  int get hashCode => _jf(_jc(_jc(0, isEvaluated.hashCode), _value.hashCode));
 
   @override
   String toString() =>
@@ -59,6 +70,9 @@ class Transaction {
         ? transaction
         : null;
   }
+
+  static T runRequired<T>(T Function(Transaction) runner) =>
+      runner(requiredTransaction);
 
   static T run<T>(T Function(Transaction) runner) {
     if (isInTransaction) {
@@ -163,8 +177,6 @@ class Transaction {
   }
 
   void _evaluatePendingNodes() {
-    print('_evaluatePendingNodes()');
-
     while (_pendingNodes.isNotEmpty) {
       final pendingNode = _pendingNodes.first;
       _pendingNodes.remove(pendingNode);
@@ -190,16 +202,12 @@ class Transaction {
   }
 
   void _evaluateTargetNodes(Node sourceNode) {
-    print('_evaluateTargetNodes: $sourceNode');
-
     for (final targetNode in sourceNode._targetNodes.keys) {
       _evaluateNode(targetNode);
     }
   }
 
   void _evaluateNode(Node node, {bool forceEvaluation = false}) {
-    print('_evaluateNode: $node [$forceEvaluation]');
-
     assert(!_evaluations.containsKey(node));
 
     bool allInputsEvaluated = true;
@@ -214,8 +222,6 @@ class Transaction {
       }
       inputMap[entry.key] = evaluation;
     }
-
-    print('inputMap: $inputMap [$allInputsEvaluated]');
 
     if (forceEvaluation || allInputsEvaluated) {
       final evaluation = node._evaluate(inputMap);
@@ -238,11 +244,11 @@ abstract class Node<S> extends Referenceable {
   final String _debugLabel;
 
   NodeEvaluation<S> Function(Map<dynamic, NodeEvaluation> inputs)
-      _evaluateHandler;
+      evaluateHandler;
 
-  void Function(S) _commitHandler;
+  void Function(S) commitHandler;
 
-  void Function(S) _publishHandler;
+  void Function(S) publishHandler;
 
   final Map<dynamic, HostedReference<Node>> _sourceReferences = Map.identity();
 
@@ -253,15 +259,16 @@ abstract class Node<S> extends Referenceable {
   Node({
     String debugLabel,
     EvaluationType evaluationType,
-    NodeEvaluation<S> Function(Map<dynamic, NodeEvaluation> inputs)
-        evaluateHandler,
+    @required
+        NodeEvaluation<S> Function(Map<dynamic, NodeEvaluation> inputs)
+            evaluateHandler,
     void Function(S) commitHandler,
     void Function(S) publishHandler,
   })  : _debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
         _evaluationType = evaluationType,
-        _evaluateHandler = evaluateHandler,
-        _commitHandler = commitHandler,
-        _publishHandler = publishHandler {
+        this.evaluateHandler = evaluateHandler,
+        this.commitHandler = commitHandler ?? ((_) {}),
+        this.publishHandler = publishHandler ?? ((_) {}) {
     _evaluationPriority = _evaluationType == EvaluationType.ALL_INPUTS ? 0 : 1;
   }
 
@@ -337,40 +344,12 @@ abstract class Node<S> extends Referenceable {
     }
   }
 
-  set evaluateHandler(
-      NodeEvaluation<S> Function(Map<dynamic, NodeEvaluation> inputs)
-          evaluateHandler) {
-    if (_evaluateHandler != null) {
-      throw StateError('Evaluate handler already defined');
-    }
-
-    _evaluateHandler = evaluateHandler;
-  }
-
-  set commitHandler(void Function(S) commitHandler) {
-    if (_commitHandler != null) {
-      throw StateError('Commit handler already defined');
-    }
-
-    _commitHandler = commitHandler;
-  }
-
-  set publishHandler(void Function(S) publishHandler) {
-    if (_publishHandler != null) {
-      throw StateError('Publish handler already defined');
-    }
-
-    _publishHandler = publishHandler;
-  }
-
   NodeEvaluation<S> _evaluate(Map<dynamic, NodeEvaluation> inputMap) =>
-      _evaluateHandler != null
-          ? _evaluateHandler(inputMap)
-          : throw UnsupportedError('Node evaluation');
+      evaluateHandler(inputMap);
 
-  void _commit(S value) => _commitHandler?.call(value);
+  void _commit(S value) => commitHandler.call(value);
 
-  void _publish(S value) => _publishHandler?.call(value);
+  void _publish(S value) => publishHandler.call(value);
 }
 
 class IndexedNode<S> extends Node<S> {
@@ -440,4 +419,16 @@ class NamedNode<S> extends Node<S> {
 
     super.onUnreferenced();
   }
+}
+
+int _jc(int hash, int value) {
+  hash = 0x1fffffff & (hash + value);
+  hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+  return hash ^ (hash >> 6);
+}
+
+int _jf(int hash) {
+  hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
+  hash = hash ^ (hash >> 11);
+  return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
 }

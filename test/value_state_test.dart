@@ -201,6 +201,51 @@ void main() {
 
       sink.close();
     });
+
+    test('Test 8', () {
+      final sink = ValueStateSink<int>(-1);
+
+      final events1 = Queue<int>();
+
+      final subscription1 = runTransaction(
+          () => sink.state.map((value) => 2 * value).distinct().listen((event) {
+                events1.addLast(event);
+              }));
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(-2));
+      expect(events1, isEmpty);
+
+      sink.send(1);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+
+      sink.send(1);
+
+      expect(events1, isEmpty);
+
+      sink.send(2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(4));
+      expect(events1, isEmpty);
+
+      sink.send(1);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+
+      sink.send(1);
+
+      expect(events1, isEmpty);
+
+      subscription1.cancel();
+
+      sink.close();
+    });
   });
 
   group('OptionalValueState', () {

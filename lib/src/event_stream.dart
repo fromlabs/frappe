@@ -114,55 +114,50 @@ class EventStream<E> {
           [Merger<E> merger]) =>
       throw UnimplementedError();
 
-  OptionalEventStream<EE> asOptional<EE>() {
-    final transaction = Transaction.requiredTransaction;
+  OptionalEventStream<EE> asOptional<EE>() =>
+      Transaction.runRequired((transaction) {
+        final targetNode = transaction.node(IndexedNode<Optional<EE>>(
+            evaluateHandler: _defaultEvaluateHandler));
 
-    final targetNode = transaction.node(
-        IndexedNode<Optional<EE>>(evaluateHandler: _defaultEvaluateHandler));
+        targetNode.link(_node);
 
-    targetNode.link(_node);
+        return OptionalEventStream._(targetNode);
+      });
 
-    return OptionalEventStream._(targetNode);
-  }
+  ValueState<E> toState(E initValue) => toStateLazy(LazyValue(initValue));
 
-  // TODO implementare
-  ValueState<E> toState(E initValue) => throw UnimplementedError();
-
-  // TODO implementare
-  ValueState<E> toStateLazy(LazyValue<E> lazyInitValue) =>
-      throw UnimplementedError();
+  ValueState<E> toStateLazy(LazyValue<E> initLazyValue) =>
+      Transaction.runRequired((_) => createValueState(initLazyValue, this));
 
   // TODO implementare
   EventStream<E> once() => throw UnimplementedError();
 
-  EventStream<E> distinct([Equalizer<E> distinctEquals]) {
-    final transaction = Transaction.requiredTransaction;
+  EventStream<E> distinct([Equalizer<E> distinctEquals]) =>
+      Transaction.runRequired((transaction) {
+        var previousEvaluation = NodeEvaluation.not();
+        final targetNode = transaction.node(IndexedNode<E>(
+          evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
+                  inputs[0].value != previousEvaluation.value
+              ? inputs[0]
+              : NodeEvaluation.not(),
+          commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
+        ));
 
-    var previousEvaluation = NodeEvaluation.not();
-    final targetNode = transaction.node(IndexedNode<E>(
-      evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
-              inputs[0].value != previousEvaluation.value
-          ? inputs[0]
-          : NodeEvaluation.not(),
-      commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
-    ));
+        targetNode.link(_node);
 
-    targetNode.link(_node);
+        return EventStream._(targetNode);
+      });
 
-    return EventStream._(targetNode);
-  }
+  EventStream<ER> map<ER>(Mapper<E, ER> mapper) =>
+      Transaction.runRequired((transaction) {
+        final targetNode = transaction.node(IndexedNode<ER>(
+            evaluateHandler: (inputs) =>
+                NodeEvaluation<ER>(mapper.call(inputs[0].value))));
 
-  EventStream<ER> map<ER>(Mapper<E, ER> mapper) {
-    final transaction = Transaction.requiredTransaction;
+        targetNode.link(_node);
 
-    final targetNode = transaction.node(IndexedNode<ER>(
-        evaluateHandler: (inputs) =>
-            NodeEvaluation<ER>(mapper.call(inputs[0].value))));
-
-    targetNode.link(_node);
-
-    return EventStream._(targetNode);
-  }
+        return EventStream._(targetNode);
+      });
 
   EventStream<ER> mapTo<ER>(ER event) => map<ER>((_) => event);
 
@@ -172,18 +167,17 @@ class EventStream<E> {
   OptionalEventStream<E> mapToOptionalOf() =>
       map<Optional<E>>((event) => Optional<E>.of(event)).asOptional<E>();
 
-  EventStream<E> where(Filter<E> filter) {
-    final transaction = Transaction.requiredTransaction;
+  EventStream<E> where(Filter<E> filter) =>
+      Transaction.runRequired((transaction) {
+        final targetNode = transaction.node(IndexedNode<E>(
+          evaluateHandler: (inputs) =>
+              filter(inputs[0].value) ? inputs[0] : NodeEvaluation.not(),
+        ));
 
-    final targetNode = transaction.node(IndexedNode<E>(
-      evaluateHandler: (inputs) =>
-          filter(inputs[0].value) ? inputs[0] : NodeEvaluation.not(),
-    ));
+        targetNode.link(_node);
 
-    targetNode.link(_node);
-
-    return EventStream._(targetNode);
-  }
+        return EventStream._(targetNode);
+      });
 
   ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) {
     final reference = ValueStateReference<V>();
