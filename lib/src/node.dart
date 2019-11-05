@@ -5,11 +5,12 @@ import 'package:meta/meta.dart';
 
 import 'package:frappe/src/reference.dart';
 
+typedef TransactionHandler = void Function(Transaction transaction);
 typedef TransactionRunner<T> = T Function(Transaction transaction);
 typedef NodeEvaluator<S> = NodeEvaluation<S> Function(
     Map<dynamic, NodeEvaluation> inputs);
 
-enum TransactionPhase { OPENED, EVALUATION, COMMIT, PUBLISH, NOTIFY, CLOSED }
+enum TransactionPhase { OPENED, EVALUATION, COMMIT, PUBLISH, CLOSING, CLOSED }
 
 enum EvaluationType { ALL_INPUTS, ALMOST_ONE_INPUT, FIRST_EVALUATION }
 
@@ -18,16 +19,21 @@ const String transactionZoneParameter = 'transaction';
 int _nodeId = 0;
 final Set<Node> _globalTargetNodes = Set.identity();
 final Set<Node> _globalSourceNodes = Set.identity();
+final Set<Node> _globalListenNodes = Set.identity();
 
 void cleanAllNodesUnlinked() {
   _globalSourceNodes.clear();
   _globalTargetNodes.clear();
+  _globalListenNodes.clear();
 }
 
 void assertAllNodesUnlinked() {
-  if (_globalSourceNodes.isNotEmpty || _globalTargetNodes.isNotEmpty) {
+  if (_globalSourceNodes.isNotEmpty ||
+      _globalTargetNodes.isNotEmpty ||
+      _globalListenNodes.isNotEmpty) {
     print('Source nodes: ${_globalSourceNodes}');
     print('Target nodes: ${_globalTargetNodes}');
+    print('Listen nodes: ${_globalListenNodes}');
 
     throw AssertionError('Not all nodes unlinked');
   }
@@ -106,7 +112,6 @@ class Transaction {
 
           transaction._publish();
 
-          // TODO callback di fine transazione
           transaction._notify();
 
           return result;
@@ -150,19 +155,21 @@ class Transaction {
   void onError(Object error, StackTrace stacktrace) =>
       print('Uncaught error: $error\n $stacktrace');
 
-  bool hasValue(Node node) => _phase == TransactionPhase.OPENED
-      ? _evaluations.containsKey(node)
-      : throw UnsupportedError(
-          'Node value is exposed only in opened transaction phase');
+  bool hasValue(Node node) =>
+      _phase == TransactionPhase.OPENED || _phase == TransactionPhase.CLOSING
+          ? _evaluations.containsKey(node)
+          : throw UnsupportedError(
+              'Node value is exposed only in opened/closing transaction phase');
 
   S getValue<S>(Node<S> node) => hasValue(node)
       ? _evaluations[node].value
       : throw StateError('Not evaluated');
 
   void setValue<S>(Node<S> node, S output) {
-    if (_phase != TransactionPhase.OPENED) {
+    if (_phase != TransactionPhase.OPENED ||
+        _phase == TransactionPhase.CLOSING) {
       throw UnsupportedError(
-          'Node value is exposed only in opened transaction phase');
+          'Node value is exposed only in opened/closing transaction phase');
     } else if (!node.isReferenced) {
       throw ArgumentError('Node $node is not referenced');
     }
@@ -218,12 +225,17 @@ class Transaction {
   }
 
   void _notify() {
-    _phase = TransactionPhase.NOTIFY;
+    _phase = TransactionPhase.CLOSING;
 
-    // TODO implementare _notify
+    for (final node in _globalListenNodes) {
+      node._closingTransactionHandler(this);
+    }
   }
 
   void _evaluateTargetNodes(Node sourceNode) {
+    print('_evaluateTargetNodes: $sourceNode');
+    print(sourceNode._targetNodes.keys);
+
     for (final targetNode in sourceNode._targetNodes.keys) {
       _evaluateNode(targetNode);
     }
@@ -243,6 +255,8 @@ class Transaction {
         }
         inputMap[entry.key] = evaluation;
       }
+
+      print('inputMap: $inputMap');
 
       if (forceEvaluation || allInputsEvaluated) {
         final evaluation = node._evaluate(inputMap);
@@ -265,6 +279,8 @@ abstract class Node<S> extends Referenceable {
 
   final String _debugLabel;
 
+  final TransactionHandler _closingTransactionHandler;
+
   NodeEvaluator<S> evaluateHandler;
 
   ValueHandler<S> commitHandler;
@@ -283,12 +299,27 @@ abstract class Node<S> extends Referenceable {
     @required NodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
+    TransactionHandler closingTransactionHandler,
   })  : _debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
         _evaluationType = evaluationType,
         this.evaluateHandler = evaluateHandler,
         this.commitHandler = commitHandler ?? ((_) {}),
-        this.publishHandler = publishHandler ?? ((_) {}) {
+        this.publishHandler = publishHandler ?? ((_) {}),
+        this._closingTransactionHandler = closingTransactionHandler {
     _evaluationPriority = _evaluationType == EvaluationType.ALL_INPUTS ? 0 : 1;
+
+    if (_closingTransactionHandler != null) {
+      _globalListenNodes.add(this);
+    }
+  }
+
+  @override
+  void onUnreferenced() {
+    if (_closingTransactionHandler != null) {
+      _globalListenNodes.remove(this);
+    }
+
+    super.onUnreferenced();
   }
 
   NodeEvaluation<S> get _nodeEvaluationNot => NodeEvaluation.not();
@@ -383,12 +414,14 @@ class IndexNode<S> extends Node<S> {
     NodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
+    TransactionHandler closingTransactionHandler,
   }) : super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           evaluateHandler: evaluateHandler,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
+          closingTransactionHandler: closingTransactionHandler,
         );
 
   bool isLinked(int index) => _sourceIndexes.length > index;
@@ -399,12 +432,15 @@ class IndexNode<S> extends Node<S> {
     _id++;
   }
 
-  void unlink(int index) => _unlinkSource(_sourceIndexes.removeAt(index));
+  void unlink() {
+    _unlinkSource(_sourceIndexes.removeLast());
+    _id--;
+  }
 
   @override
   void onUnreferenced() {
     while (_sourceIndexes.isNotEmpty) {
-      unlink(_sourceReferences.keys.last);
+      unlink();
     }
 
     super.onUnreferenced();
@@ -418,12 +454,14 @@ class KeyNode<S> extends Node<S> {
     NodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
+    TransactionHandler closingTransactionHandler,
   }) : super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           evaluateHandler: evaluateHandler,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
+          closingTransactionHandler: closingTransactionHandler,
         );
 
   void link(key, Node source) => _linkSource(key, source);

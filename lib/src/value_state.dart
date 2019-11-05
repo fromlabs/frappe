@@ -217,16 +217,25 @@ class ValueState<V> {
   static EventStream<E> switchStream<E>(
           ValueState<EventStream<E>> streamsState) =>
       Transaction.runRequired((transaction) {
-        final targetNode = transaction
-            .node(IndexNode<E>(evaluateHandler: _defaultEvaluateHandler));
+        IndexNode<E> targetNode;
 
-        // TODO aggiungere ascoltatore di fine transazione per capire se streamsState è stato valutato allora unlink/link
-/*        
-        if (transaction.hasValue(getValueStateNode(streamsState))) {
-          targetNode.unlink(0);
-          targetNode.link(getEventStreamNode(streamsState.current()));
-        }
-*/
+        targetNode = transaction.node(IndexNode<E>(
+            evaluateHandler: _defaultEvaluateHandler,
+            closingTransactionHandler: (transaction) {
+              print('--> closingTransactionHandler');
+
+              print(
+                  'hasValue: ${transaction.hasValue(getValueStateNode(streamsState))}');
+
+              if (transaction.hasValue(getValueStateNode(streamsState))) {
+                print(
+                    'getValue: ${transaction.getValue(getValueStateNode(streamsState)).hashCode}');
+
+                targetNode.unlink();
+                targetNode.link(getEventStreamNode(streamsState.current()));
+              }
+            }));
+
         targetNode.link(getEventStreamNode(streamsState.current()));
         targetNode.reference(getValueStateNode(streamsState));
 

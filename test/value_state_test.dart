@@ -345,7 +345,11 @@ void main() {
 
       expect(events1, isEmpty);
 
+      print(sink.state.current().hashCode);
+
       sink.send(sink1.stream);
+
+      print(sink.state.current().hashCode);
 
       expect(events1, isEmpty);
 
@@ -367,7 +371,7 @@ void main() {
       expect(events1.removeLast(), equals(6));
       expect(events1, isEmpty);
 
-      sink.send(EventStream.never());
+      runTransaction(() => sink.send(EventStream.never()));
 
       expect(events1, isEmpty);
 
@@ -378,6 +382,8 @@ void main() {
 
       subscription1.cancel();
 
+      sink1.close();
+      sink2.close();
       sink.close();
     });
 
