@@ -8,16 +8,16 @@ import 'value_state.dart';
 
 Node<E> getEventStreamNode<E>(EventStream<E> stream) => stream._node;
 
-EventStream<E> createEventStream<E>(Node<E> node, [Merger<E> merger]) =>
-    EventStream._(node, merger);
+EventStream<E> createEventStream<E>(Node<E> node) => EventStream._(node);
 
-OptionalEventStream<E> createOptionalEventStream<E>(Node<Optional<E>> node,
-        [Merger<Optional<E>> merger]) =>
-    OptionalEventStream._(node, merger);
+OptionalEventStream<E> createOptionalEventStream<E>(Node<Optional<E>> node) =>
+    OptionalEventStream._(node);
 
-Merger<E> _defaultMergerFactory<E>() =>
+Merger<E> _defaultSinkMergerFactory<E>() =>
     (E newValue, E oldValue) => throw UnsupportedError(
         '''Can't send more times in the same transaction with the default merger''');
+
+Merger<E> _defaultMergerFactory<E>() => (E value1, E value2) => value1;
 
 NodeEvaluation<E> _defaultEvaluateHandler<E>(
         Map<dynamic, NodeEvaluation> inputs) =>
@@ -26,11 +26,14 @@ NodeEvaluation<E> _defaultEvaluateHandler<E>(
 class EventStreamSink<E> {
   final EventStream<E> stream;
   final Reference<Node<E>> _nodeReference;
+  final Merger<E> _sinkMerger;
 
-  factory EventStreamSink([Merger<E> merger]) =>
-      EventStreamSink._(EventStream<E>._(NamedNode<E>(), merger));
+  factory EventStreamSink([Merger<E> sinkMerger]) => Transaction.run(
+      (_) => EventStreamSink._(EventStream<E>._(KeyNode<E>()), sinkMerger));
 
-  EventStreamSink._(this.stream) : _nodeReference = Reference(stream._node);
+  EventStreamSink._(this.stream, Merger<E> sinkMerger)
+      : _nodeReference = Reference(stream._node),
+        _sinkMerger = sinkMerger ?? _defaultSinkMergerFactory<E>();
 
   bool get isClosed => _nodeReference.isDisposed;
 
@@ -41,16 +44,18 @@ class EventStreamSink<E> {
       throw StateError('Sink is closed');
     }
 
-    stream._setValue(event);
+    stream._sendValue(event, _sinkMerger);
   }
 }
 
 class OptionalEventStreamSink<E> extends EventStreamSink<Optional<E>> {
-  factory OptionalEventStreamSink([Merger<Optional<E>> merger]) =>
-      OptionalEventStreamSink._(
-          OptionalEventStream<E>._(NamedNode<Optional<E>>(), merger));
+  factory OptionalEventStreamSink([Merger<Optional<E>> sinkMerger]) =>
+      Transaction.run((_) => OptionalEventStreamSink._(
+          OptionalEventStream<E>._(KeyNode<Optional<E>>()), sinkMerger));
 
-  OptionalEventStreamSink._(OptionalEventStream<E> stream) : super._(stream);
+  OptionalEventStreamSink._(
+      OptionalEventStream<E> stream, Merger<Optional<E>> sinkMerger)
+      : super._(stream, sinkMerger);
 
   @override
   OptionalEventStream<E> get stream => super.stream;
@@ -65,7 +70,7 @@ class EventStreamLink<E> {
 
   factory EventStreamLink() => Transaction.runRequired((transaction) =>
       EventStreamLink._(EventStream<E>._(transaction
-          .node(IndexedNode<E>(evaluateHandler: _defaultEvaluateHandler)))));
+          .node(IndexNode<E>(evaluateHandler: _defaultEvaluateHandler)))));
 
   EventStreamLink._(this.stream);
 
@@ -79,14 +84,13 @@ class EventStreamLink<E> {
         _node.link(stream._node);
       });
 
-  IndexedNode<E> get _node => stream._node;
+  IndexNode<E> get _node => stream._node;
 }
 
 class OptionalEventStreamLink<E> extends EventStreamLink<Optional<E>> {
-  factory OptionalEventStreamLink() =>
-      Transaction.runRequired((transaction) => OptionalEventStreamLink._(
-          OptionalEventStream<E>._(transaction.node(IndexedNode<Optional<E>>(
-              evaluateHandler: _defaultEvaluateHandler)))));
+  factory OptionalEventStreamLink() => Transaction.runRequired((transaction) =>
+      OptionalEventStreamLink._(OptionalEventStream<E>._(transaction.node(
+          IndexNode<Optional<E>>(evaluateHandler: _defaultEvaluateHandler)))));
 
   OptionalEventStreamLink._(OptionalEventStream<E> stream) : super._(stream);
 
@@ -101,27 +105,67 @@ class OptionalEventStreamLink<E> extends EventStreamLink<Optional<E>> {
 class EventStream<E> {
   final Node<E> _node;
 
-  final Merger<E> _merger;
+  EventStream.never() : _node = KeyNode<E>() {
+    Transaction.runRequired((transaction) => transaction.node(_node));
+  }
 
-  EventStream.never()
-      : _node = NamedNode<E>(),
-        _merger = null;
+  EventStream._(this._node, [Merger<E> sinkMerger]);
 
-  EventStream._(this._node, [Merger<E> merger])
-      : _merger = merger ?? _defaultMergerFactory<E>();
-
-  // TODO implementare merges
   static EventStream<E> merges<E>(Iterable<EventStream<E>> streams,
           [Merger<E> merger]) =>
-      throw UnimplementedError();
+      Transaction.runRequired((transaction) {
+        final streamList = streams.toList();
+        return _merges(transaction, streamList, 0, streamList.length,
+            merger ?? _defaultMergerFactory<E>());
+      });
+
+  static EventStream<E> _merges<E>(
+      Transaction transaction, List<EventStream<E>> streams, int start, int end,
+      [Merger<E> merger]) {
+    switch (end - start) {
+      case 0:
+        return EventStream<E>.never();
+      case 1:
+        return streams[start];
+      case 2:
+        return _merges2(
+            transaction, streams[start], streams[start + 1], merger);
+      default:
+        final mid = (start + end) ~/ 2;
+        return _merges2(
+            transaction,
+            _merges<E>(transaction, streams, start, mid, merger),
+            _merges<E>(transaction, streams, mid, end, merger),
+            merger);
+    }
+  }
+
+  static EventStream<E> _merges2<E>(
+      Transaction transaction, EventStream<E> stream1, EventStream<E> stream2,
+      [Merger<E> merger]) {
+    final targetNode = transaction.node(IndexNode<E>(
+      evaluationType: EvaluationType.ALMOST_ONE_INPUT,
+      evaluateHandler: (inputs) {
+        if (inputs[0].isNotEvaluated) {
+          return inputs[1];
+        } else if (inputs[1].isEvaluated) {
+          return NodeEvaluation<E>(merger(inputs[0].value, inputs[1].value));
+        } else {
+          return inputs[0];
+        }
+      },
+    ));
+
+    targetNode..link(stream1._node)..link(stream2._node);
+
+    return EventStream._(targetNode);
+  }
 
   OptionalEventStream<EE> asOptional<EE>() =>
       Transaction.runRequired((transaction) {
-        final targetNode = transaction.node(IndexedNode<Optional<EE>>(
-            evaluateHandler: _defaultEvaluateHandler));
-
+        final targetNode = transaction.node(
+            IndexNode<Optional<EE>>(evaluateHandler: _defaultEvaluateHandler));
         targetNode.link(_node);
-
         return OptionalEventStream._(targetNode);
       });
 
@@ -130,13 +174,23 @@ class EventStream<E> {
   ValueState<E> toStateLazy(LazyValue<E> lazyInitValue) =>
       Transaction.runRequired((_) => createValueState(lazyInitValue, this));
 
-  // TODO implementare once
-  EventStream<E> once() => throw UnimplementedError();
+  EventStream<E> once() => Transaction.runRequired((transaction) {
+        var neverEvaluated = true;
+        final targetNode = transaction.node(IndexNode<E>(
+          evaluateHandler: (inputs) =>
+              neverEvaluated ? inputs[0] : NodeEvaluation.not(),
+          commitHandler: (_) => neverEvaluated = false,
+        ));
+
+        targetNode.link(_node);
+
+        return EventStream._(targetNode);
+      });
 
   EventStream<E> distinct([Equalizer<E> distinctEquals]) =>
       Transaction.runRequired((transaction) {
-        var previousEvaluation = NodeEvaluation.not();
-        final targetNode = transaction.node(IndexedNode<E>(
+        var previousEvaluation = NodeEvaluation<E>.not();
+        final targetNode = transaction.node(IndexNode<E>(
           evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
                   inputs[0].value != previousEvaluation.value
               ? inputs[0]
@@ -151,7 +205,7 @@ class EventStream<E> {
 
   EventStream<ER> map<ER>(Mapper<E, ER> mapper) =>
       Transaction.runRequired((transaction) {
-        final targetNode = transaction.node(IndexedNode<ER>(
+        final targetNode = transaction.node(IndexNode<ER>(
             evaluateHandler: (inputs) =>
                 NodeEvaluation<ER>(mapper.call(inputs[0].value))));
 
@@ -163,14 +217,16 @@ class EventStream<E> {
   EventStream<ER> mapTo<ER>(ER event) => map<ER>((_) => event);
 
   OptionalEventStream<EE> mapToOptionalEmpty<EE>() =>
-      mapTo<Optional<EE>>(Optional<EE>.empty()).asOptional<EE>();
+      Transaction.runRequired((transaction) =>
+          mapTo<Optional<EE>>(Optional<EE>.empty()).asOptional<EE>());
 
   OptionalEventStream<E> mapToOptionalOf() =>
-      map<Optional<E>>((event) => Optional<E>.of(event)).asOptional<E>();
+      Transaction.runRequired((transaction) =>
+          map<Optional<E>>((event) => Optional<E>.of(event)).asOptional<E>());
 
   EventStream<E> where(Filter<E> filter) =>
       Transaction.runRequired((transaction) {
-        final targetNode = transaction.node(IndexedNode<E>(
+        final targetNode = transaction.node(IndexNode<E>(
           evaluateHandler: (inputs) =>
               filter(inputs[0].value) ? inputs[0] : NodeEvaluation.not(),
         ));
@@ -180,56 +236,68 @@ class EventStream<E> {
         return EventStream._(targetNode);
       });
 
-  ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) {
-    final reference = ValueStateLink<V>();
-    reference
-        .connect(snapshot(reference.state, accumulator).toState(initValue));
-    return reference.state;
-  }
+  ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) =>
+      Transaction.runRequired((transaction) {
+        final reference = ValueStateLink<V>();
+        reference
+            .connect(snapshot(reference.state, accumulator).toState(initValue));
+        return reference.state;
+      });
 
   ValueState<V> accumulateLazy<V>(
-      LazyValue<V> lazyInitValue, Accumulator<E, V> accumulator) {
-    final reference = ValueStateLink<V>();
-    reference.connect(
-        snapshot(reference.state, accumulator).toStateLazy(lazyInitValue));
-    return reference.state;
-  }
+          LazyValue<V> lazyInitValue, Accumulator<E, V> accumulator) =>
+      Transaction.runRequired((transaction) {
+        final reference = ValueStateLink<V>();
+        reference.connect(
+            snapshot(reference.state, accumulator).toStateLazy(lazyInitValue));
+        return reference.state;
+      });
 
-  EventStream<ER> collect<ER, V>(V initValue, Collector<E, V, ER> collector) {
-    final reference = EventStreamLink<V>();
-    final stream = snapshot(reference.stream.toState(initValue), collector);
-    reference.connect(stream.map((tuple) => tuple.item2));
-    return stream.map((tuple) => tuple.item1);
-  }
+  EventStream<ER> collect<ER, V>(V initValue, Collector<E, V, ER> collector) =>
+      Transaction.runRequired((transaction) {
+        final reference = EventStreamLink<V>();
+        final stream = snapshot(reference.stream.toState(initValue), collector);
+        reference.connect(stream.map((tuple) => tuple.item2));
+        return stream.map((tuple) => tuple.item1);
+      });
 
   EventStream<ER> collectLazy<ER, V>(
-      LazyValue<V> lazyInitValue, Collector<E, V, ER> collector) {
-    final reference = EventStreamLink<V>();
-    final stream =
-        snapshot(reference.stream.toStateLazy(lazyInitValue), collector);
-    reference.connect(stream.map((tuple) => tuple.item2));
-    return stream.map((tuple) => tuple.item1);
-  }
+          LazyValue<V> lazyInitValue, Collector<E, V, ER> collector) =>
+      Transaction.runRequired((transaction) {
+        final reference = EventStreamLink<V>();
+        final stream =
+            snapshot(reference.stream.toStateLazy(lazyInitValue), collector);
+        reference.connect(stream.map((tuple) => tuple.item2));
+        return stream.map((tuple) => tuple.item1);
+      });
 
-  EventStream<E> gate(ValueState<bool> conditionState) => snapshot(
-          conditionState,
-          (event, condition) =>
-              condition ? Optional<E>.of(event) : Optional<E>.empty())
-      .asOptional<E>()
-      .mapWhereOptional();
+  EventStream<E> gate(ValueState<bool> conditionState) =>
+      Transaction.runRequired((transaction) => snapshot(
+              conditionState,
+              (event, condition) =>
+                  condition ? Optional<E>.of(event) : Optional<E>.empty())
+          .asOptional<E>()
+          .mapWhereOptional());
 
   EventStream<E> orElse(EventStream<E> stream) => merges<E>([this, stream]);
 
   EventStream<E> orElses(Iterable<EventStream<E>> streams) =>
       merges<E>([this, ...streams]);
 
+  // TODO creare cmq un riferimento a fromState legato a questo nodo
   EventStream<ER> snapshot<V2, ER>(
           ValueState<V2> fromState, Combiner2<E, V2, ER> combiner) =>
-      map((event) => combiner(event, fromState.current()));
+      Transaction.runRequired((transaction) {
+        final stream = map((event) => combiner(event, fromState.current()));
+
+        stream._node.reference(getValueStateNode(fromState));
+
+        return stream;
+      });
 
   ListenSubscription listen(ValueHandler<E> onEvent) =>
       Transaction.run((transaction) {
-        final listenNode = IndexedNode<E>(
+        final listenNode = IndexNode<E>(
           evaluateHandler: _defaultEvaluateHandler,
           publishHandler: onEvent,
         );
@@ -253,7 +321,7 @@ class EventStream<E> {
     return listenSubscription;
   }
 
-  void _setValue(E event) {
+  void _sendValue(E event, Merger<E> sinkMerger) {
     Transaction.run((transaction) {
       if (transaction.phase != TransactionPhase.OPENED) {
         throw UnsupportedError('''Can't send value in callbacks''');
@@ -261,7 +329,7 @@ class EventStream<E> {
 
       if (transaction.hasValue(_node)) {
         transaction.setValue(
-            _node, _merger(event, transaction.getValue(_node)));
+            _node, sinkMerger(event, transaction.getValue(_node)));
       } else {
         transaction.setValue(_node, event);
       }
@@ -272,12 +340,15 @@ class EventStream<E> {
 class OptionalEventStream<E> extends EventStream<Optional<E>> {
   OptionalEventStream.never() : super.never();
 
-  OptionalEventStream._(Node<Optional<E>> node, [Merger<Optional<E>> merger])
-      : super._(node, merger);
+  OptionalEventStream._(Node<Optional<E>> node) : super._(node);
 
   @override
   OptionalValueState<E> toState(Optional<E> initValue) =>
       super.toState(initValue).asOptional<E>();
+
+  @override
+  OptionalEventStream<EE> asOptional<EE>() =>
+      throw StateError('Already optional');
 
   EventStream<bool> mapIsEmptyOptional() => map((event) => !event.isPresent);
 

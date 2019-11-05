@@ -1,6 +1,6 @@
 library frappe;
 
-export 'src/base.dart' show assertCleanup;
+export 'src/base.dart' show cleanUp, assertCleanup;
 export 'src/disposable.dart';
 export 'src/event_stream.dart'
     show

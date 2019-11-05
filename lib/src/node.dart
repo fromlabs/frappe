@@ -5,11 +5,24 @@ import 'package:meta/meta.dart';
 
 import 'package:frappe/src/reference.dart';
 
+typedef TransactionRunner<T> = T Function(Transaction transaction);
+typedef NodeEvaluator<S> = NodeEvaluation<S> Function(
+    Map<dynamic, NodeEvaluation> inputs);
+
+enum TransactionPhase { OPENED, EVALUATION, COMMIT, PUBLISH, NOTIFY, CLOSED }
+
+enum EvaluationType { ALL_INPUTS, ALMOST_ONE_INPUT, FIRST_EVALUATION }
+
 const String transactionZoneParameter = 'transaction';
 
 int _nodeId = 0;
 final Set<Node> _globalTargetNodes = Set.identity();
 final Set<Node> _globalSourceNodes = Set.identity();
+
+void cleanAllNodesUnlinked() {
+  _globalSourceNodes.clear();
+  _globalTargetNodes.clear();
+}
 
 void assertAllNodesUnlinked() {
   if (_globalSourceNodes.isNotEmpty || _globalTargetNodes.isNotEmpty) {
@@ -20,13 +33,8 @@ void assertAllNodesUnlinked() {
   }
 }
 
-typedef TransactionRunner<T> = T Function(Transaction transaction);
-typedef NodeEvaluator<S> = NodeEvaluation<S> Function(
-    Map<dynamic, NodeEvaluation> inputs);
-
-enum TransactionPhase { OPENED, EVALUATION, COMMIT, PUBLISH, CLOSED }
-
-enum EvaluationType { ALL_INPUTS, ALMOST_ONE_INPUT, FIRST_EVALUATION }
+int _priorityComparator(Node node1, Node node2) =>
+    node2._evaluationPriority - node1._evaluationPriority;
 
 class NodeEvaluation<S> {
   final S _value;
@@ -98,6 +106,9 @@ class Transaction {
 
           transaction._publish();
 
+          // TODO callback di fine transazione
+          transaction._notify();
+
           return result;
         }, zoneValues: {transactionZoneParameter: transaction});
         return result;
@@ -113,8 +124,7 @@ class Transaction {
 
   final Set<Node> _firstNodes = Set.identity();
 
-  final Set<Node> _pendingNodes = SplayTreeSet<Node>(
-      (node1, node2) => node2._evaluationPriority - node1._evaluationPriority);
+  final Set<Node> _pendingNodes = SplayTreeSet<Node>(_priorityComparator);
 
   TransactionPhase _phase = TransactionPhase.OPENED;
 
@@ -207,6 +217,12 @@ class Transaction {
     }
   }
 
+  void _notify() {
+    _phase = TransactionPhase.NOTIFY;
+
+    // TODO implementare _notify
+  }
+
   void _evaluateTargetNodes(Node sourceNode) {
     for (final targetNode in sourceNode._targetNodes.keys) {
       _evaluateNode(targetNode);
@@ -214,32 +230,32 @@ class Transaction {
   }
 
   void _evaluateNode(Node node, {bool forceEvaluation = false}) {
-    assert(!_evaluations.containsKey(node));
+    if (!_evaluations.containsKey(node)) {
+      bool allInputsEvaluated = true;
+      final inputMap = <dynamic, NodeEvaluation>{};
+      for (final entry in node._sourceReferences.entries) {
+        NodeEvaluation evaluation;
+        if (_evaluations.containsKey(entry.value.value)) {
+          evaluation = _evaluations[entry.value.value];
+        } else {
+          allInputsEvaluated = false;
+          evaluation = entry.value.value._nodeEvaluationNot;
+        }
+        inputMap[entry.key] = evaluation;
+      }
 
-    bool allInputsEvaluated = true;
-    final inputMap = <dynamic, NodeEvaluation>{};
-    for (final entry in node._sourceReferences.entries) {
-      NodeEvaluation evaluation;
-      if (_evaluations.containsKey(entry.value.value)) {
-        evaluation = _evaluations[entry.value.value];
+      if (forceEvaluation || allInputsEvaluated) {
+        final evaluation = node._evaluate(inputMap);
+
+        if (evaluation.isEvaluated) {
+          _evaluations[node] = evaluation;
+          _pendingNodes.remove(node);
+
+          _evaluateTargetNodes(node);
+        }
       } else {
-        allInputsEvaluated = false;
-        evaluation = NodeEvaluation.not();
+        _pendingNodes.add(node);
       }
-      inputMap[entry.key] = evaluation;
-    }
-
-    if (forceEvaluation || allInputsEvaluated) {
-      final evaluation = node._evaluate(inputMap);
-
-      if (evaluation.isEvaluated) {
-        _evaluations[node] = evaluation;
-        _pendingNodes.remove(node);
-
-        _evaluateTargetNodes(node);
-      }
-    } else {
-      _pendingNodes.add(node);
     }
   }
 }
@@ -274,6 +290,8 @@ abstract class Node<S> extends Referenceable {
         this.publishHandler = publishHandler ?? ((_) {}) {
     _evaluationPriority = _evaluationType == EvaluationType.ALL_INPUTS ? 0 : 1;
   }
+
+  NodeEvaluation<S> get _nodeEvaluationNot => NodeEvaluation.not();
 
   @override
   String toString() =>
@@ -355,11 +373,11 @@ abstract class Node<S> extends Referenceable {
   void _publish(S value) => publishHandler.call(value);
 }
 
-class IndexedNode<S> extends Node<S> {
+class IndexNode<S> extends Node<S> {
   final List<int> _sourceIndexes = [];
   int _id = 0;
 
-  IndexedNode({
+  IndexNode({
     String debugLabel,
     EvaluationType evaluationType = EvaluationType.ALL_INPUTS,
     NodeEvaluator<S> evaluateHandler,
@@ -393,8 +411,8 @@ class IndexedNode<S> extends Node<S> {
   }
 }
 
-class NamedNode<S> extends Node<S> {
-  NamedNode({
+class KeyNode<S> extends Node<S> {
+  KeyNode({
     String debugLabel,
     EvaluationType evaluationType = EvaluationType.ALL_INPUTS,
     NodeEvaluator<S> evaluateHandler,

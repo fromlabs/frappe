@@ -2,6 +2,10 @@ import 'package:meta/meta.dart';
 
 final Map<Referenceable, Set<Reference>> _globalReferences = Map.identity();
 
+void cleanAllUnreferenced() {
+  _globalReferences.clear();
+}
+
 void assertAllUnreferenced() {
   if (_globalReferences.isNotEmpty) {
     print('References: ${_globalReferences}');

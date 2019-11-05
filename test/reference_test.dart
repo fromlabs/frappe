@@ -11,7 +11,7 @@ class NodeReferenceable extends Referenceable {
 }
 
 void main() {
-  test('Reference test 1', () {
+  test('Reference test 01', () {
     final n1 = NodeReferenceable("node1");
     final n2 = NodeReferenceable("node2");
     final n3 = NodeReferenceable("node3");
@@ -42,7 +42,7 @@ void main() {
     expect(n3.isReferenced, false);
   });
 
-  test('Reference test 2', () {
+  test('Reference test 02', () {
     final n1 = NodeReferenceable("node1");
     final n2 = NodeReferenceable("node2");
     final n3 = NodeReferenceable("node3");
@@ -74,7 +74,7 @@ void main() {
     expect(n3.isReferenced, false);
   });
 
-  test('Reference test 3', () {
+  test('Reference test 03', () {
     final n1 = NodeReferenceable("node1");
 
     final nRef1 = Reference(n1);
@@ -88,7 +88,7 @@ void main() {
     expect(n1.isReferenced, false);
   });
 
-  test('Reference test 4', () {
+  test('Reference test 04', () {
     final n1 = NodeReferenceable("node1");
     final n2 = NodeReferenceable("node2");
 
@@ -104,7 +104,7 @@ void main() {
     expect(n2.isReferenced, false);
   });
 
-  test('Reference test 5', () {
+  test('Reference test 05', () {
     final n1 = NodeReferenceable("node1");
 
     final nRef1 = Reference(n1);
@@ -116,7 +116,7 @@ void main() {
     expect(n1.isReferenced, false);
   });
 
-  test('Reference test 6', () {
+  test('Reference test 06', () {
     final n1 = NodeReferenceable("node1");
     final n2 = NodeReferenceable("node2");
 
@@ -139,7 +139,7 @@ void main() {
     expect(n2.isReferenced, false);
   });
 
-  test('Reference test 7', () {
+  test('Reference test 07', () {
     final n1 = NodeReferenceable("node1");
     final n2 = NodeReferenceable("node2");
 
@@ -162,7 +162,7 @@ void main() {
     expect(n2.isReferenced, false);
   });
 
-  test('Reference test 8', () {
+  test('Reference test 08', () {
     final n1 = NodeReferenceable("node1");
     final n2 = NodeReferenceable("node2");
 

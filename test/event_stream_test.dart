@@ -6,16 +6,20 @@ import 'package:optional/optional.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(() {
+    cleanUp();
+  });
+
   tearDown(() {
     assertCleanup();
   });
 
   group('EventStream', () {
-    test('Test 1', () {
-      EventStream<int>.never();
+    test('Test 01', () {
+      runTransaction(() => EventStream<int>.never());
     });
 
-    test('Test 4', () {
+    test('Test 04', () {
       final sink = EventStreamSink<int>();
 
       sink.send(0);
@@ -31,8 +35,16 @@ void main() {
         events2.addLast(event);
       });
 
+      final events3 = Queue<int>();
+
+      final subscription2 =
+          runTransaction(() => sink.stream.once().listen((event) {
+                events3.addLast(event);
+              }));
+
       expect(events1, isEmpty);
       expect(events2, isEmpty);
+      expect(events3, isEmpty);
 
       sink.send(1);
 
@@ -42,6 +54,9 @@ void main() {
       expect(events2, isNotEmpty);
       expect(events2.removeLast(), equals(1));
       expect(events2, isEmpty);
+      expect(events3, isNotEmpty);
+      expect(events3.removeLast(), equals(1));
+      expect(events3, isEmpty);
 
       sink.send(2);
 
@@ -49,24 +64,29 @@ void main() {
       expect(events1.removeLast(), equals(2));
       expect(events1, isEmpty);
       expect(events2, isEmpty);
+      expect(events3, isEmpty);
 
       subscription1.cancel();
+      subscription2.cancel();
 
       sink.send(3);
 
       expect(events1, isEmpty);
       expect(events2, isEmpty);
+      expect(events3, isEmpty);
 
       sink.close();
     });
 
-    test('Test 5', () {
+    test('Test 05', () {
       final sink = EventStreamSink<int>();
 
       ListenSubscription subscription1;
+      ListenSubscription subscription2;
 
       final events1 = Queue<int>();
       final events2 = Queue<int>();
+      final events3 = Queue<int>();
 
       runTransaction(() {
         sink.send(1);
@@ -78,6 +98,10 @@ void main() {
         sink.stream.listenOnce((event) {
           events2.addLast(event);
         });
+
+        subscription2 = sink.stream.once().listen((event) {
+          events3.addLast(event);
+        });
       });
 
       expect(events1, isNotEmpty);
@@ -86,6 +110,9 @@ void main() {
       expect(events2, isNotEmpty);
       expect(events2.removeLast(), equals(1));
       expect(events2, isEmpty);
+      expect(events3, isNotEmpty);
+      expect(events3.removeLast(), equals(1));
+      expect(events3, isEmpty);
 
       sink.send(2);
 
@@ -93,18 +120,21 @@ void main() {
       expect(events1.removeLast(), equals(2));
       expect(events1, isEmpty);
       expect(events2, isEmpty);
+      expect(events3, isEmpty);
 
       subscription1.cancel();
+      subscription2.cancel();
 
       sink.send(3);
 
       expect(events1, isEmpty);
       expect(events2, isEmpty);
+      expect(events3, isEmpty);
 
       sink.close();
     });
 
-    test('Test 6', () {
+    test('Test 06', () {
       final sink = EventStreamSink<int>();
 
       expect(
@@ -113,7 +143,7 @@ void main() {
       sink.close();
     });
 
-    test('Test 7', () {
+    test('Test 07', () {
       final sink = EventStreamSink<int>();
 
       final events1 = Queue<int>();
@@ -136,7 +166,7 @@ void main() {
       sink.close();
     });
 
-    test('Test 8', () {
+    test('Test 08', () {
       final sink = EventStreamSink<int>();
 
       final events1 = Queue<int>();
@@ -179,7 +209,7 @@ void main() {
       sink.close();
     });
 
-    test('Test 9', () {
+    test('Test 09', () {
       final sink = EventStreamSink<int>();
 
       final events1 = Queue<int>();
@@ -367,16 +397,142 @@ void main() {
 
       sink.close();
     });
+
+    test('Test 14', () {
+      final sink1 = EventStreamSink<int>();
+      final sink2 = EventStreamSink<int>();
+
+      sink1.send(1);
+      sink2.send(-1);
+
+      final events1 = Queue<int>();
+      final subscription1 = runTransaction(
+          () => sink1.stream.orElse(sink2.stream).listen((event) {
+                events1.addLast(event);
+              }));
+
+      expect(events1, isEmpty);
+
+      sink1.send(2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+
+      sink2.send(-2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(-2));
+      expect(events1, isEmpty);
+
+      runTransaction(() {
+        sink1.send(3);
+        sink2.send(-3);
+      });
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(3));
+      expect(events1, isEmpty);
+
+      subscription1.cancel();
+
+      sink1.send(4);
+      sink2.send(-4);
+
+      expect(events1, isEmpty);
+
+      sink1.close();
+      sink2.close();
+    });
+
+    test('Test 15', () {
+      final sink = EventStreamSink<int>();
+
+      final events1 = Queue<int>();
+
+      final subscription1 = runTransaction(() => sink.stream
+              .accumulate<int>(0, (value, state) => value + state)
+              .listen((event) {
+            events1.addLast(event);
+          }));
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(0));
+      expect(events1, isEmpty);
+
+      sink.send(1);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(1));
+      expect(events1, isEmpty);
+
+      sink.send(2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(3));
+      expect(events1, isEmpty);
+
+      subscription1.cancel();
+
+      sink.close();
+    });
+
+    test('Test 16', () {
+      final sink1 = EventStreamSink<int>();
+      final sink2 = EventStreamSink<int>();
+
+      sink1.send(1);
+      sink2.send(-1);
+
+      final events1 = Queue<int>();
+      final subscription1 = runTransaction(
+          () => sink1.stream.orElse(sink2.stream).listen((event) {
+                events1.addLast(event);
+              }));
+
+      expect(events1, isEmpty);
+
+      sink1.send(2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+
+      sink2.send(-2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(-2));
+      expect(events1, isEmpty);
+
+      runTransaction(() {
+        sink1.send(3);
+        sink2.send(-3);
+      });
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(3));
+      expect(events1, isEmpty);
+
+      subscription1.cancel();
+
+      sink1.send(4);
+      sink2.send(-4);
+
+      expect(events1, isEmpty);
+
+      sink1.close();
+      sink2.close();
+    });
   });
 
   group('OptionalEventStream', () {
-    test('Test 1', () {
-      OptionalEventStream<int>.never();
+    test('Test 01', () {
+      runTransaction(() => OptionalEventStream<int>.never());
     });
   });
 
   group('EventStreamSink', () {
-    test('Test 1', () {
+    test('Test 01', () {
       final sink = EventStreamSink<int>();
 
       expect(sink.isClosed, isFalse);
@@ -390,7 +546,7 @@ void main() {
       expect(() => sink.send(1), throwsStateError);
     });
 
-    test('Test 2', () {
+    test('Test 02', () {
       final sink = EventStreamSink<int>();
 
       sink.send(1);
@@ -410,7 +566,7 @@ void main() {
       sink.close();
     });
 
-    test('Test 3', () {
+    test('Test 03', () {
       final sink = EventStreamSink<int>((newValue, oldValue) => newValue);
 
       sink.send(1);
@@ -432,7 +588,7 @@ void main() {
   });
 
   group('OptionalEventStreamSink', () {
-    test('Test 1', () {
+    test('Test 01', () {
       final sink = OptionalEventStreamSink<int>();
 
       expect(sink.isClosed, isFalse);
@@ -446,7 +602,7 @@ void main() {
       expect(() => sink.send(Optional.of(1)), throwsStateError);
     });
 
-    test('Test 2', () {
+    test('Test 02', () {
       final sink = OptionalEventStreamSink<int>();
 
       sink.send(Optional.of(1));
@@ -466,7 +622,7 @@ void main() {
       sink.close();
     });
 
-    test('Test 3', () {
+    test('Test 03', () {
       final sink =
           OptionalEventStreamSink<int>((newValue, oldValue) => newValue);
 
