@@ -345,11 +345,7 @@ void main() {
 
       expect(events1, isEmpty);
 
-      print(sink.state.current().hashCode);
-
       sink.send(sink1.stream);
-
-      print(sink.state.current().hashCode);
 
       expect(events1, isEmpty);
 

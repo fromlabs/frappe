@@ -14,6 +14,5 @@ typedef Combiner4<V1, V2, V3, V4, VR> = VR Function(
 typedef Combiner5<V1, V2, V3, V4, V5, VR> = VR Function(
     V1 value1, V2 value2, V3 value3, V4 value4, V5 value5);
 typedef Filter<V> = bool Function(V value);
-typedef ValueHandler<V> = void Function(V value);
 typedef ValueProvider<V> = V Function();
 typedef Equalizer<V> = bool Function(V value1, V value2);

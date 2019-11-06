@@ -19,8 +19,8 @@ class ReferenceGroup {
 
   bool _isDisposed = false;
 
-  Reference<R> reference<R extends Referenceable>(R referencable) =>
-      add(Reference(referencable));
+  Reference<R> reference<R extends Referenceable>(R referenceable) =>
+      add(Reference(referenceable));
 
   Reference<R> add<R extends Referenceable>(Reference<R> reference) {
     _checkDisposed();

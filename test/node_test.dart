@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'package:frappe/frappe.dart';
 import 'package:frappe/src/node.dart';
 import 'package:frappe/src/reference.dart';
+import 'package:frappe/src/node/node_evaluation.dart';
 import 'package:test/test.dart';
 
 void main() {

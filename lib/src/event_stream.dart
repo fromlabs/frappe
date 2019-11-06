@@ -5,6 +5,7 @@ import 'package:optional/optional.dart';
 import 'listen_subscription.dart';
 import 'typedef.dart';
 import 'value_state.dart';
+import 'node/node_evaluation.dart';
 
 Node<E> getEventStreamNode<E>(EventStream<E> stream) => stream._node;
 

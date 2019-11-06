@@ -5,6 +5,7 @@ import 'package:optional/optional.dart';
 import 'event_stream.dart';
 import 'listen_subscription.dart';
 import 'typedef.dart';
+import 'node/node_evaluation.dart';
 
 Node<V> getValueStateNode<V>(ValueState<V> state) =>
     getEventStreamNode(state._stream);
@@ -180,13 +181,11 @@ class ValueState<V> {
       : this._(LazyValue(initValue), EventStream<V>.never());
 
   ValueState._(this._currentLazyValue, this._stream) {
-    final _superCommitHandler = _node.commitHandler;
-
-    _node.commitHandler = (value) {
-      _superCommitHandler(value);
+    nodeGraph.overrideCommit<V>(_node, (superCommit, value) {
+      superCommit(value);
 
       _currentLazyValue = LazyValue(value);
-    };
+    });
   }
 
   static ValueState<VR> combines<VR>(
@@ -222,15 +221,7 @@ class ValueState<V> {
         targetNode = transaction.node(IndexNode<E>(
             evaluateHandler: _defaultEvaluateHandler,
             closingTransactionHandler: (transaction) {
-              print('--> closingTransactionHandler');
-
-              print(
-                  'hasValue: ${transaction.hasValue(getValueStateNode(streamsState))}');
-
               if (transaction.hasValue(getValueStateNode(streamsState))) {
-                print(
-                    'getValue: ${transaction.getValue(getValueStateNode(streamsState)).hashCode}');
-
                 targetNode.unlink();
                 targetNode.link(getEventStreamNode(streamsState.current()));
               }

@@ -5,7 +5,7 @@ homepage: https://github.com/fromlabs/frappe
 author: Roberto Tassi <roberto.tassi@fromlabs.org>
 
 environment:
-  sdk: '>=2.2.2 <3.0.0'
+  sdk: '>=2.6.0 <3.0.0'
 
 dependencies:
   pedantic: ^1.0.0  
