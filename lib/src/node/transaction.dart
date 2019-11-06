@@ -10,12 +10,26 @@ typedef TransactionRunner<T> = T Function(Transaction transaction);
 
 enum TransactionPhase { OPENED, EVALUATION, COMMIT, PUBLISH, CLOSING, CLOSED }
 
-const String _transactionZoneParameter = 'transaction';
+void cleanAllListenNodes() {
+  Transaction._globalListenNodes.clear();
+}
 
-int _priorityComparator(Node node1, Node node2) =>
-    node2.evaluationPriority - node1.evaluationPriority;
+void assertAllListenNodes() {
+  if (Transaction._globalListenNodes.isNotEmpty) {
+    print('Listen nodes: ${Transaction._globalListenNodes}');
+
+    throw AssertionError('Not all listen nodes removed');
+  }
+}
 
 class Transaction {
+  static const String _transactionZoneParameter = 'transaction';
+
+  static final Map<Node, TransactionHandler> _globalListenNodes =
+      Map.identity();
+
+  static bool _isInitialized = false;
+
   static bool get isInTransaction => currentTransaction != null;
 
   static Transaction get requiredTransaction => currentTransaction != null
@@ -28,6 +42,12 @@ class Transaction {
     return transaction != null && transaction.phase != TransactionPhase.CLOSED
         ? transaction
         : null;
+  }
+
+  static init() {
+    _isInitialized = true;
+    nodeGraph.addNodeHandler = Transaction.addNode;
+    nodeGraph.removeNodeHandler = Transaction.removeNode;
   }
 
   static T runRequired<T>(TransactionRunner<T> runner) =>
@@ -47,11 +67,11 @@ class Transaction {
 
           transaction._evaluate();
 
-          transaction._commit();
+          transaction._commitValue();
 
-          transaction._publish();
+          transaction._publishValue();
 
-          transaction._notify();
+          transaction._notifyClosingTransaction();
 
           return result;
         }, zoneValues: {_transactionZoneParameter: transaction});
@@ -62,30 +82,48 @@ class Transaction {
     }
   }
 
+  static void addNode(Node node) => Transaction.runRequired((transaction) {
+        final reference = Reference(node);
+
+        if (reference.value.evaluationType == EvaluationType.FIRST_EVALUATION) {
+          transaction._firstNodes.add(reference.value);
+        }
+
+        transaction._referenceGroup.add(reference);
+      });
+
+  static void removeNode(Node node) {
+    _globalListenNodes.remove(node);
+  }
+
   final ReferenceGroup _referenceGroup = ReferenceGroup();
 
   final Map<Node, NodeEvaluation> _evaluations = Map.identity();
 
   final Set<Node> _firstNodes = Set.identity();
 
-  final Set<Node> _pendingNodes = SplayTreeSet<Node>(_priorityComparator);
+  final Set<Node> _pendingNodes = SplayTreeSet<Node>(
+      (node1, node2) => node2.evaluationPriority - node1.evaluationPriority);
 
   TransactionPhase _phase = TransactionPhase.OPENED;
+
+  Transaction() {
+    if (!_isInitialized) {
+      throw StateError('Transaction not initialized');
+    }
+  }
 
   TransactionPhase get phase => _phase;
 
   N node<N extends Node>(N node) {
-    final reference = Reference(node);
-
-    // TODO spostare su addNodeHandler
-    if (reference.value.evaluationType == EvaluationType.FIRST_EVALUATION) {
-      _firstNodes.add(reference.value);
-    }
-
-    _referenceGroup.add(reference);
+    _referenceGroup.add(Reference(node));
 
     return node;
   }
+
+  void addClosingTransactionHandler(
+          Node node, TransactionHandler transactionHandler) =>
+      _globalListenNodes[node] = transactionHandler;
 
   // TODO gestione delle eccezioni con handler in transaction
   void onError(Object error, StackTrace stacktrace) =>
@@ -180,7 +218,7 @@ class Transaction {
     }
   }
 
-  void _commit() {
+  void _commitValue() {
     _phase = TransactionPhase.COMMIT;
 
     for (final entry in _evaluations.entries) {
@@ -188,7 +226,7 @@ class Transaction {
     }
   }
 
-  void _publish() {
+  void _publishValue() {
     _phase = TransactionPhase.PUBLISH;
 
     for (final entry in _evaluations.entries) {
@@ -196,11 +234,11 @@ class Transaction {
     }
   }
 
-  void _notify() {
+  void _notifyClosingTransaction() {
     _phase = TransactionPhase.CLOSING;
 
-    for (final node in nodeGraph.listenNodes) {
-      nodeGraph.notify(node, this);
+    for (final handler in _globalListenNodes.values) {
+      handler(this);
     }
   }
 }

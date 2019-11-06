@@ -126,8 +126,8 @@ class ValueStateLink<V> {
             LazyValue<V>.provide(() => link.isLinked
                 ? link._linkedState.current()
                 : throw StateError('Link is not connected')),
-            createEventStream<V>(transaction.node(
-                IndexNode<V>(evaluateHandler: _defaultEvaluateHandler)))));
+            createEventStream<V>(
+                IndexNode<V>(evaluateHandler: _defaultEvaluateHandler))));
 
         return link;
       });
@@ -157,8 +157,8 @@ class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
             LazyValue<Optional<V>>.provide(() => link.isLinked
                 ? link._linkedState.current()
                 : throw StateError('Link is not connected')),
-            createOptionalEventStream(transaction.node(IndexNode<Optional<V>>(
-                evaluateHandler: _defaultEvaluateHandler))))));
+            createOptionalEventStream(IndexNode<Optional<V>>(
+                evaluateHandler: _defaultEvaluateHandler)))));
 
     return link;
   }
@@ -191,13 +191,13 @@ class ValueState<V> {
   static ValueState<VR> combines<VR>(
           Iterable<ValueState> states, Combiners<VR> combiner) =>
       Transaction.runRequired((transaction) {
-        final targetNode = transaction.node(IndexNode<VR>(
+        final targetNode = IndexNode<VR>(
             evaluationType: EvaluationType.ALMOST_ONE_INPUT,
             evaluateHandler: (inputs) => NodeEvaluation(combiner(
                 Map.fromIterables(states, inputs.values).entries.map((entry) =>
                     entry.value.isEvaluated
                         ? entry.value.value
-                        : entry.key.current())))));
+                        : entry.key.current()))));
 
         states.forEach(
             (state) => targetNode.link(getEventStreamNode(state._stream)));
@@ -212,20 +212,19 @@ class ValueState<V> {
   static ValueState<V> switchState<V>(ValueState<ValueState<V>> statesState) =>
       throw UnimplementedError();
 
-  // TODO implementare switchStream
   static EventStream<E> switchStream<E>(
           ValueState<EventStream<E>> streamsState) =>
       Transaction.runRequired((transaction) {
         IndexNode<E> targetNode;
 
-        targetNode = transaction.node(IndexNode<E>(
-            evaluateHandler: _defaultEvaluateHandler,
-            closingTransactionHandler: (transaction) {
-              if (transaction.hasValue(getValueStateNode(streamsState))) {
-                targetNode.unlink();
-                targetNode.link(getEventStreamNode(streamsState.current()));
-              }
-            }));
+        targetNode = IndexNode<E>(evaluateHandler: _defaultEvaluateHandler);
+
+        transaction.addClosingTransactionHandler(targetNode, (transaction) {
+          if (transaction.hasValue(getValueStateNode(streamsState))) {
+            targetNode.unlink();
+            targetNode.link(getEventStreamNode(streamsState.current()));
+          }
+        });
 
         targetNode.link(getEventStreamNode(streamsState.current()));
         targetNode.reference(getValueStateNode(streamsState));
@@ -249,10 +248,10 @@ class ValueState<V> {
           currentLazy()._castOptional<VV>(), _stream.asOptional()));
 
   EventStream<V> toValues() => Transaction.runRequired((transaction) {
-        final targetNode = transaction.node(IndexNode<V>(
+        final targetNode = IndexNode<V>(
             evaluationType: EvaluationType.FIRST_EVALUATION,
             evaluateHandler: (inputs) =>
-                inputs[0].isEvaluated ? inputs[0] : NodeEvaluation(current())));
+                inputs[0].isEvaluated ? inputs[0] : NodeEvaluation(current()));
 
         targetNode.link(_node);
 

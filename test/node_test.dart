@@ -7,6 +7,10 @@ import 'package:frappe/src/node/node_evaluation.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUpAll(() {
+    Transaction.init();
+  });
+
   setUp(() {
     cleanUp();
   });
@@ -20,8 +24,8 @@ void main() {
     IndexNode<int> node2;
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
+      node2 = IndexNode<int>(debugLabel: 'N2');
 
       expect(node1.isReferenced, true);
       expect(node2.isReferenced, true);
@@ -44,9 +48,9 @@ void main() {
     IndexNode<int> node3;
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
-      node3 = tx.node(IndexNode<int>(debugLabel: 'N3'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
+      node2 = IndexNode<int>(debugLabel: 'N2');
+      node3 = IndexNode<int>(debugLabel: 'N3');
 
       node3.link(node1);
       node3.link(node2);
@@ -59,9 +63,9 @@ void main() {
     IndexNode<int> node3;
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
-      node3 = tx.node(IndexNode<int>(debugLabel: 'N3'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
+      node2 = IndexNode<int>(debugLabel: 'N2');
+      node3 = IndexNode<int>(debugLabel: 'N3');
 
       node1.link(node2);
       node2.link(node3);
@@ -75,19 +79,21 @@ void main() {
     IndexNode<int> node2;
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
+      node2 = IndexNode<int>(debugLabel: 'N2');
 
       node2.link(node1);
     });
   });
 
   test('Node test 4b', () {
-    IndexNode<int> node1 = IndexNode<int>(debugLabel: 'N1');
+    IndexNode<int> node1 =
+        Transaction.run((_) => IndexNode<int>(debugLabel: 'N1'));
+
     IndexNode<int> node2;
 
     Transaction.run((tx) {
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
+      node2 = IndexNode<int>(debugLabel: 'N2');
 
       node2.link(node1);
     });
@@ -95,10 +101,12 @@ void main() {
 
   test('Node test 4c', () {
     IndexNode<int> node1;
-    IndexNode<int> node2 = IndexNode<int>(debugLabel: 'N2');
+
+    IndexNode<int> node2 =
+        Transaction.run((_) => IndexNode<int>(debugLabel: 'N2'));
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
 
       expect(() => node2.link(node1), throwsArgumentError);
     });
@@ -111,9 +119,9 @@ void main() {
     Reference<IndexNode<int>> node3Ref;
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
-      node3 = tx.node(IndexNode<int>(debugLabel: 'N3'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
+      node2 = IndexNode<int>(debugLabel: 'N2');
+      node3 = IndexNode<int>(debugLabel: 'N3');
 
       expect(node1.isReferenced, true);
       expect(node2.isReferenced, true);
@@ -146,8 +154,8 @@ void main() {
     Reference<IndexNode<int>> node2Ref;
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
+      node2 = IndexNode<int>(debugLabel: 'N2');
       node2Ref = Reference(node2);
     });
 
@@ -162,8 +170,8 @@ void main() {
     Reference<IndexNode<int>> node2Ref;
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
+      node2 = IndexNode<int>(debugLabel: 'N2');
       node2Ref = Reference(node2);
     });
 
@@ -178,8 +186,8 @@ void main() {
     Reference<IndexNode<int>> node2Ref;
 
     Transaction.run((tx) {
-      node1 = tx.node(IndexNode<int>(debugLabel: 'N1'));
-      node2 = tx.node(IndexNode<int>(debugLabel: 'N2'));
+      node1 = IndexNode<int>(debugLabel: 'N1');
+      node2 = IndexNode<int>(debugLabel: 'N2');
 
       expect(node1.isReferenced, true);
       expect(node2.isReferenced, true);
@@ -197,9 +205,9 @@ void main() {
       expect(node1.isReferenced, true);
       expect(node2.isReferenced, true);
 
-      tx.node(node2);
-      node2Ref.dispose();
       node2bRef = Reference(node2);
+
+      node2Ref.dispose();
     });
 
     expect(node1.isReferenced, true);
@@ -228,10 +236,10 @@ void main() {
     Reference<IndexNode<int>> node2Ref;
 
     Transaction.run((tx) {
-      final node1 = tx.node(IndexNode<int>(debugLabel: 'INPUT'));
-      final node2 = tx.node(IndexNode<int>(
+      final node1 = IndexNode<int>(debugLabel: 'INPUT');
+      final node2 = IndexNode<int>(
           debugLabel: 'DUPLIFY',
-          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0].value)));
+          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0].value));
 
       node2.link(node1);
 
@@ -258,64 +266,62 @@ void main() {
     final publishs = Queue<int>();
 
     Transaction.run((tx) {
-      final input1 = tx.node(IndexNode<int>(debugLabel: 'INPUT1'));
-      final input2 = tx.node(IndexNode<int>(debugLabel: 'INPUT2'));
-      final input3 = tx.node(IndexNode<int>(debugLabel: 'INPUT3'));
+      final input1 = IndexNode<int>(debugLabel: 'INPUT1');
+      final input2 = IndexNode<int>(debugLabel: 'INPUT2');
+      final input3 = IndexNode<int>(debugLabel: 'INPUT3');
 
-      final node21 = tx.node(IndexNode<int>(
+      final node21 = IndexNode<int>(
           debugLabel: 'DUPLIFY1',
-          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0].value)))
+          evaluateHandler: (inputs) => NodeEvaluation(2 * inputs[0].value))
         ..link(input1);
 
-      final node22 = tx.node(IndexNode<int>(
+      final node22 = IndexNode<int>(
           debugLabel: 'TRIPLIFY2',
-          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0].value)))
+          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0].value))
         ..link(input2);
 
-      final merge2 = tx.node(IndexNode<int>(
+      final merge2 = IndexNode<int>(
         debugLabel: 'MERGE2',
         evaluationType: EvaluationType.ALMOST_ONE_INPUT,
         evaluateHandler: (inputs) =>
             inputs[0].isEvaluated ? inputs[0] : inputs[1],
-      ))
+      )
         ..link(input3)
         ..link(node22);
 
-      final node32 = tx.node(IndexNode<int>(
+      final node32 = IndexNode<int>(
           debugLabel: 'TRIPLIFY3',
-          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0].value)))
+          evaluateHandler: (inputs) => NodeEvaluation(3 * inputs[0].value))
         ..link(merge2);
 
       // ignore: unused_local_variable
       int merge1Value = 1;
-      final merge1 = tx.node(IndexNode<int>(
+      final merge1 = IndexNode<int>(
         debugLabel: 'MERGE1',
         evaluationType: EvaluationType.ALMOST_ONE_INPUT,
         evaluateHandler: (inputs) =>
             inputs[0].isEvaluated ? inputs[0] : inputs[1],
         commitHandler: (value) => merge1Value = value,
-      ))
+      )
         ..link(node32)
         ..link(node21);
 
       var previousEvaluation = NodeEvaluation.not();
-      final distinct = tx.node(IndexNode<int>(
+      final distinct = IndexNode<int>(
         debugLabel: 'DISTINCT',
         evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
                 inputs[0].value != previousEvaluation.value
             ? inputs[0]
             : NodeEvaluation.not(),
         commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
-      ))
-        ..link(merge1);
+      )..link(merge1);
 
-      final listen = tx.node(IndexNode<int>(
+      final listen = IndexNode<int>(
         debugLabel: 'LISTEN',
         evaluateHandler: (inputs) => inputs[0],
         commitHandler: commits.add,
         publishHandler: publishs.add,
-      ))
-        ..link(distinct);
+      )..link(distinct);
 
       input1Ref = Reference(input1);
       input2Ref = Reference(input2);

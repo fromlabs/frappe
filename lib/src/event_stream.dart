@@ -70,8 +70,8 @@ class EventStreamLink<E> {
   final EventStream<E> stream;
 
   factory EventStreamLink() => Transaction.runRequired((transaction) =>
-      EventStreamLink._(EventStream<E>._(transaction
-          .node(IndexNode<E>(evaluateHandler: _defaultEvaluateHandler)))));
+      EventStreamLink._(EventStream<E>._(
+          IndexNode<E>(evaluateHandler: _defaultEvaluateHandler))));
 
   EventStreamLink._(this.stream);
 
@@ -90,8 +90,8 @@ class EventStreamLink<E> {
 
 class OptionalEventStreamLink<E> extends EventStreamLink<Optional<E>> {
   factory OptionalEventStreamLink() => Transaction.runRequired((transaction) =>
-      OptionalEventStreamLink._(OptionalEventStream<E>._(transaction.node(
-          IndexNode<Optional<E>>(evaluateHandler: _defaultEvaluateHandler)))));
+      OptionalEventStreamLink._(OptionalEventStream<E>._(
+          IndexNode<Optional<E>>(evaluateHandler: _defaultEvaluateHandler))));
 
   OptionalEventStreamLink._(OptionalEventStream<E> stream) : super._(stream);
 
@@ -106,9 +106,7 @@ class OptionalEventStreamLink<E> extends EventStreamLink<Optional<E>> {
 class EventStream<E> {
   final Node<E> _node;
 
-  EventStream.never() : _node = KeyNode<E>() {
-    Transaction.runRequired((transaction) => transaction.node(_node));
-  }
+  EventStream.never() : _node = KeyNode<E>();
 
   EventStream._(this._node, [Merger<E> sinkMerger]);
 
@@ -144,7 +142,7 @@ class EventStream<E> {
   static EventStream<E> _merges2<E>(
       Transaction transaction, EventStream<E> stream1, EventStream<E> stream2,
       [Merger<E> merger]) {
-    final targetNode = transaction.node(IndexNode<E>(
+    final targetNode = IndexNode<E>(
       evaluationType: EvaluationType.ALMOST_ONE_INPUT,
       evaluateHandler: (inputs) {
         if (inputs[0].isNotEvaluated) {
@@ -155,7 +153,7 @@ class EventStream<E> {
           return inputs[0];
         }
       },
-    ));
+    );
 
     targetNode..link(stream1._node)..link(stream2._node);
 
@@ -164,8 +162,8 @@ class EventStream<E> {
 
   OptionalEventStream<EE> asOptional<EE>() =>
       Transaction.runRequired((transaction) {
-        final targetNode = transaction.node(
-            IndexNode<Optional<EE>>(evaluateHandler: _defaultEvaluateHandler));
+        final targetNode =
+            IndexNode<Optional<EE>>(evaluateHandler: _defaultEvaluateHandler);
         targetNode.link(_node);
         return OptionalEventStream._(targetNode);
       });
@@ -177,11 +175,11 @@ class EventStream<E> {
 
   EventStream<E> once() => Transaction.runRequired((transaction) {
         var neverEvaluated = true;
-        final targetNode = transaction.node(IndexNode<E>(
+        final targetNode = IndexNode<E>(
           evaluateHandler: (inputs) =>
               neverEvaluated ? inputs[0] : NodeEvaluation.not(),
           commitHandler: (_) => neverEvaluated = false,
-        ));
+        );
 
         targetNode.link(_node);
 
@@ -191,13 +189,13 @@ class EventStream<E> {
   EventStream<E> distinct([Equalizer<E> distinctEquals]) =>
       Transaction.runRequired((transaction) {
         var previousEvaluation = NodeEvaluation<E>.not();
-        final targetNode = transaction.node(IndexNode<E>(
+        final targetNode = IndexNode<E>(
           evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
                   inputs[0].value != previousEvaluation.value
               ? inputs[0]
               : NodeEvaluation.not(),
           commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
-        ));
+        );
 
         targetNode.link(_node);
 
@@ -206,9 +204,9 @@ class EventStream<E> {
 
   EventStream<ER> map<ER>(Mapper<E, ER> mapper) =>
       Transaction.runRequired((transaction) {
-        final targetNode = transaction.node(IndexNode<ER>(
+        final targetNode = IndexNode<ER>(
             evaluateHandler: (inputs) =>
-                NodeEvaluation<ER>(mapper.call(inputs[0].value))));
+                NodeEvaluation<ER>(mapper.call(inputs[0].value)));
 
         targetNode.link(_node);
 
@@ -227,10 +225,10 @@ class EventStream<E> {
 
   EventStream<E> where(Filter<E> filter) =>
       Transaction.runRequired((transaction) {
-        final targetNode = transaction.node(IndexNode<E>(
+        final targetNode = IndexNode<E>(
           evaluateHandler: (inputs) =>
               filter(inputs[0].value) ? inputs[0] : NodeEvaluation.not(),
-        ));
+        );
 
         targetNode.link(_node);
 

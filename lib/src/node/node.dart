@@ -2,7 +2,6 @@ import 'package:meta/meta.dart';
 
 import '../reference.dart';
 import 'node_evaluation.dart';
-import 'transaction.dart';
 
 typedef NodeHandler<V> = void Function(Node<V> node);
 typedef ValueHandler<V> = void Function(V value);
@@ -22,12 +21,9 @@ void assertAllNodesUnlinked() => nodeGraph.assertAllNodesUnlinked();
 class _NodeGraph {
   final Set<Node> _globalTargetNodes = Set.identity();
   final Set<Node> _globalSourceNodes = Set.identity();
-  final Set<Node> _globalListenNodes = Set.identity();
 
   NodeHandler addNodeHandler = (Node node) {};
   NodeHandler removeNodeHandler = (Node node) {};
-
-  Set<Node> get listenNodes => _globalListenNodes;
 
   Map<Node, Set> getTargetNodes(Node node) => node._targetNodes;
 
@@ -37,36 +33,22 @@ class _NodeGraph {
   void cleanAllNodesUnlinked() {
     _globalSourceNodes.clear();
     _globalTargetNodes.clear();
-    _globalListenNodes.clear();
   }
 
   void assertAllNodesUnlinked() {
-    if (_globalSourceNodes.isNotEmpty ||
-        _globalTargetNodes.isNotEmpty ||
-        _globalListenNodes.isNotEmpty) {
+    if (_globalSourceNodes.isNotEmpty || _globalTargetNodes.isNotEmpty) {
       print('Source nodes: ${_globalSourceNodes}');
       print('Target nodes: ${_globalTargetNodes}');
-      print('Listen nodes: ${_globalListenNodes}');
 
       throw AssertionError('Not all nodes unlinked');
     }
   }
 
   void addNode(Node node) {
-    // TODO spostare sulla Transaction
-    if (node._closingTransactionHandler != null) {
-      _globalListenNodes.add(node);
-    }
-
     addNodeHandler(node);
   }
 
   void removeNode(Node node) {
-    // TODO spostare sulla Transaction
-    if (node._closingTransactionHandler != null) {
-      _globalListenNodes.remove(node);
-    }
-
     removeNodeHandler(node);
   }
 
@@ -97,10 +79,6 @@ class _NodeGraph {
 
   void publish<S>(Node<S> node, S value) => node._publish(value);
 
-  // TODO toglierlo da qui e metterlo in transaction (non voglio transaction in node)
-  void notify<S>(Node<S> node, Transaction transaction) =>
-      node._closingTransactionHandler(transaction);
-
   void overrideCommit<S>(
       Node<S> node, OverrideValueHandler<S> overrideCommitHandler) {
     final superCommitHandler = node._commitHandler;
@@ -127,9 +105,6 @@ abstract class Node<S> extends Referenceable {
 
   ValueHandler<S> _publishHandler;
 
-  // TODO spostare l'handler sulla transazione
-  final TransactionHandler _closingTransactionHandler;
-
   int _evaluationPriority;
 
   Node({
@@ -138,11 +113,9 @@ abstract class Node<S> extends Referenceable {
     @required NodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
-    TransactionHandler closingTransactionHandler,
   })  : debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
         this.evaluationType = evaluationType,
-        _evaluateHandler = evaluateHandler,
-        _closingTransactionHandler = closingTransactionHandler {
+        _evaluateHandler = evaluateHandler {
     _commitHandler = commitHandler ?? (S value) {};
     _publishHandler = publishHandler ?? (S value) {};
     _evaluationPriority = evaluationType == EvaluationType.ALL_INPUTS ? 0 : 1;
@@ -251,14 +224,12 @@ class IndexNode<S> extends Node<S> {
     NodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
-    TransactionHandler closingTransactionHandler,
   }) : super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           evaluateHandler: evaluateHandler,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
-          closingTransactionHandler: closingTransactionHandler,
         );
 
   bool isLinked(int index) => _sourceIndexes.length > index;
@@ -293,14 +264,12 @@ class KeyNode<S> extends Node<S> {
     NodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
-    TransactionHandler closingTransactionHandler,
   }) : super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           evaluateHandler: evaluateHandler,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
-          closingTransactionHandler: closingTransactionHandler,
         );
 
   void link(key, Node source) => _linkSource(key, source);
