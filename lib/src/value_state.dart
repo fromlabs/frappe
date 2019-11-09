@@ -1,11 +1,11 @@
-import 'package:frappe/src/node.dart';
-import 'package:frappe/src/transaction.dart';
 import 'package:optional/optional.dart';
 
+import 'reference.dart';
+import 'node.dart';
+import 'transaction.dart';
 import 'event_stream.dart';
 import 'listen_subscription.dart';
 import 'typedef.dart';
-import 'node/node_evaluation.dart';
 
 Node<V> getValueStateNode<V>(ValueState<V> state) =>
     getEventStreamNode(state._stream);
@@ -14,9 +14,8 @@ ValueState<V> createValueState<V>(
         LazyValue<V> lazyInitValue, EventStream<V> stream) =>
     ValueState._(lazyInitValue, stream);
 
-NodeEvaluation<V> _defaultEvaluateHandler<V>(
-        Map<dynamic, NodeEvaluation> inputs) =>
-    inputs[0];
+NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
+    inputs.evaluation;
 
 class LazyValue<V> {
   final ValueProvider<V> _provider;
@@ -127,7 +126,7 @@ class ValueStateLink<V> {
                 ? link._linkedState.current()
                 : throw StateError('Link is not connected')),
             createEventStream<V>(
-                IndexNode<V>(evaluateHandler: _defaultEvaluateHandler))));
+                KeyNode<V>(evaluateHandler: _defaultEvaluateHandler))));
 
         return link;
       });
@@ -145,7 +144,7 @@ class ValueStateLink<V> {
         _node.link(state._node);
       });
 
-  IndexNode<V> get _node => state._node;
+  KeyNode<V> get _node => state._node;
 }
 
 class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
@@ -157,7 +156,7 @@ class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
             LazyValue<Optional<V>>.provide(() => link.isLinked
                 ? link._linkedState.current()
                 : throw StateError('Link is not connected')),
-            createOptionalEventStream(IndexNode<Optional<V>>(
+            createOptionalEventStream(KeyNode<Optional<V>>(
                 evaluateHandler: _defaultEvaluateHandler)))));
 
     return link;
@@ -175,32 +174,61 @@ class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
 class ValueState<V> {
   LazyValue<V> _currentLazyValue;
 
+  Reference _currentValueReference;
+
   final EventStream<V> _stream;
 
   ValueState.constant(V initValue)
       : this._(LazyValue(initValue), EventStream<V>.never());
 
-  ValueState._(this._currentLazyValue, this._stream) {
+  ValueState._(LazyValue<V> lazyInitValue, this._stream)
+      : _currentLazyValue = lazyInitValue {
+    if (lazyInitValue.hasValue) {
+      _initCurrentValueReference(lazyInitValue.get());
+    }
+
     nodeGraph.overrideCommit<V>(_node, (superCommit, value) {
       superCommit(value);
 
-      _currentLazyValue = LazyValue(value);
+      if (!_currentLazyValue.hasValue ||
+          !identical(value, _currentLazyValue.get())) {
+        final currentValueReference = _currentValueReference;
+
+        _currentLazyValue = LazyValue(value);
+        _initCurrentValueReference(value);
+
+        currentValueReference?.dispose();
+      }
     });
+  }
+
+  void _initCurrentValueReference(V value) {
+    if (value is EventStream) {
+      _currentValueReference = _node.reference(getEventStreamNode(value));
+    } else if (value is ValueState) {
+      _currentValueReference = _node.reference(value._node);
+    } else if (value is Referenceable) {
+      _currentValueReference = _node.reference(value);
+    } else {
+      _currentValueReference = null;
+    }
   }
 
   static ValueState<VR> combines<VR>(
           Iterable<ValueState> states, Combiners<VR> combiner) =>
       Transaction.runRequired((transaction) {
         final targetNode = IndexNode<VR>(
-            evaluationType: EvaluationType.ALMOST_ONE_INPUT,
-            evaluateHandler: (inputs) => NodeEvaluation(combiner(
-                Map.fromIterables(states, inputs.values).entries.map((entry) =>
-                    entry.value.isEvaluated
-                        ? entry.value.value
-                        : entry.key.current()))));
+            evaluationType: EvaluationType.almostOneInput,
+            evaluateHandler: (inputs) => NodeEvaluation(
+                  combiner(Map.fromIterables(states, inputs.evaluations)
+                      .entries
+                      .map((entry) => entry.value.isEvaluated
+                          ? entry.value.value
+                          : entry.key.current())),
+                ));
 
-        states.forEach(
-            (state) => targetNode.link(getEventStreamNode(state._stream)));
+        targetNode
+            .link(states.map((state) => getEventStreamNode(state._stream)));
 
         return ValueState._(
             LazyValue.combines(
@@ -208,16 +236,33 @@ class ValueState<V> {
             createEventStream(targetNode));
       });
 
-  // TODO implementare switchState
   static ValueState<V> switchState<V>(ValueState<ValueState<V>> statesState) =>
-      throw UnimplementedError();
+      Transaction.runRequired((transaction) {
+        KeyNode<V> targetNode;
+
+        targetNode = KeyNode<V>(evaluateHandler: _defaultEvaluateHandler);
+
+        transaction.addClosingTransactionHandler(targetNode, (transaction) {
+          if (transaction.hasValue(getValueStateNode(statesState))) {
+            targetNode.unlink();
+            targetNode.link(getValueStateNode(statesState.current()));
+          }
+        });
+
+        targetNode.link(getValueStateNode(statesState.current()));
+        targetNode.reference(getValueStateNode(statesState));
+
+        return ValueState._(
+            LazyValue.provide(() => statesState.current().current()),
+            createEventStream(targetNode));
+      });
 
   static EventStream<E> switchStream<E>(
           ValueState<EventStream<E>> streamsState) =>
       Transaction.runRequired((transaction) {
-        IndexNode<E> targetNode;
+        KeyNode<E> targetNode;
 
-        targetNode = IndexNode<E>(evaluateHandler: _defaultEvaluateHandler);
+        targetNode = KeyNode<E>(evaluateHandler: _defaultEvaluateHandler);
 
         transaction.addClosingTransactionHandler(targetNode, (transaction) {
           if (transaction.hasValue(getValueStateNode(streamsState))) {
@@ -248,10 +293,11 @@ class ValueState<V> {
           currentLazy()._castOptional<VV>(), _stream.asOptional()));
 
   EventStream<V> toValues() => Transaction.runRequired((transaction) {
-        final targetNode = IndexNode<V>(
-            evaluationType: EvaluationType.FIRST_EVALUATION,
-            evaluateHandler: (inputs) =>
-                inputs[0].isEvaluated ? inputs[0] : NodeEvaluation(current()));
+        final targetNode = KeyNode<V>(
+            evaluationType: EvaluationType.firstEvaluation,
+            evaluateHandler: (inputs) => inputs.evaluation.isEvaluated
+                ? inputs.evaluation
+                : NodeEvaluation(current()));
 
         targetNode.link(_node);
 

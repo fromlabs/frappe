@@ -1,3 +1,5 @@
+const String defaultEvaluationKey = 'default';
+
 class NodeEvaluation<S> {
   final S _value;
 

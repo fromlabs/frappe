@@ -1,6 +1,8 @@
-import 'package:meta/meta.dart';
-
 import '../reference.dart';
+
+import 'node_evaluation_collection.dart';
+import 'node_evaluation_list.dart';
+import 'node_evaluation_map.dart';
 import 'node_evaluation.dart';
 
 typedef NodeHandler<V> = void Function(Node<V> node);
@@ -9,8 +11,18 @@ typedef OverrideValueHandler<V> = void Function(
     ValueHandler<V> superCommit, V value);
 typedef NodeEvaluator<V> = NodeEvaluation<V> Function(
     Map<dynamic, NodeEvaluation> inputs);
+typedef KeyNodeEvaluator<V> = NodeEvaluation<V> Function(
+    NodeEvaluationMap inputs);
+typedef IndexNodeEvaluator<V> = NodeEvaluation<V> Function(
+    NodeEvaluationList inputs);
 
-enum EvaluationType { ALL_INPUTS, ALMOST_ONE_INPUT, FIRST_EVALUATION }
+enum EvaluationType {
+  always,
+  allInputs,
+  almostOneInput,
+  firstEvaluation,
+  never
+}
 
 final nodeGraph = _NodeGraph();
 
@@ -68,12 +80,9 @@ class _NodeGraph {
     _globalSourceNodes.remove(node);
   }
 
-  NodeEvaluation<S> createNodeEvaluationNot<S>(Node<S> node) =>
-      node._nodeEvaluationNot;
-
   NodeEvaluation<S> evaluate<S>(
-          Node<S> node, Map<dynamic, NodeEvaluation> inputMap) =>
-      node._evaluate(inputMap);
+          Node<S> node, NodeEvaluationCollection inputs) =>
+      node._evaluate(inputs);
 
   void commit<S>(Node<S> node, S value) => node._commit(value);
 
@@ -86,6 +95,10 @@ class _NodeGraph {
     node._commitHandler =
         (S value) => overrideCommitHandler(superCommitHandler, value);
   }
+
+  NodeEvaluationCollection createEvaluationInputs(Node node,
+          Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries) =>
+      node._createEvaluationInputs(inputEntries);
 }
 
 abstract class Node<S> extends Referenceable {
@@ -99,8 +112,6 @@ abstract class Node<S> extends Referenceable {
 
   final Map<Node, Set> _targetNodes = Map.identity();
 
-  NodeEvaluator<S> _evaluateHandler;
-
   ValueHandler<S> _commitHandler;
 
   ValueHandler<S> _publishHandler;
@@ -110,20 +121,20 @@ abstract class Node<S> extends Referenceable {
   Node({
     String debugLabel,
     EvaluationType evaluationType,
-    @required NodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
   })  : debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
-        this.evaluationType = evaluationType,
-        _evaluateHandler = evaluateHandler {
+        this.evaluationType = evaluationType {
     _commitHandler = commitHandler ?? (S value) {};
     _publishHandler = publishHandler ?? (S value) {};
-    _evaluationPriority = evaluationType == EvaluationType.ALL_INPUTS ? 0 : 1;
+    _evaluationPriority = evaluationType == EvaluationType.allInputs ? 0 : 1;
 
     nodeGraph.addNode(this);
   }
 
   int get evaluationPriority => _evaluationPriority;
+
+  bool get isLinked => _sourceReferences.isNotEmpty;
 
   @override
   void onUnreferenced() {
@@ -136,11 +147,13 @@ abstract class Node<S> extends Referenceable {
   String toString() =>
       '[$debugLabel:$runtimeType:${isReferenced ? 'REFERENCED' : 'UNREFERENCED'}:$_evaluationPriority]';
 
-  NodeEvaluation<S> get _nodeEvaluationNot => NodeEvaluation.not();
-
   void _linkSource(key, Node source) {
-    if (!isReferenced) {
+    assert(key != null);
+
+    if (isUnreferenced) {
       throw ArgumentError('Unreferenced target node');
+    } else if (source.isUnreferenced) {
+      throw ArgumentError('Unreferenced source node');
     }
 
     source._checkCycle(this);
@@ -206,8 +219,10 @@ abstract class Node<S> extends Referenceable {
     }
   }
 
-  NodeEvaluation<S> _evaluate(Map<dynamic, NodeEvaluation> inputMap) =>
-      _evaluateHandler(inputMap);
+  NodeEvaluationCollection _createEvaluationInputs(
+      Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries);
+
+  NodeEvaluation<S> _evaluate(covariant NodeEvaluationCollection inputs);
 
   void _commit(S value) => _commitHandler(value);
 
@@ -215,73 +230,104 @@ abstract class Node<S> extends Referenceable {
 }
 
 class IndexNode<S> extends Node<S> {
-  final List<int> _sourceIndexes = [];
-  int _id = 0;
+  final IndexNodeEvaluator<S> _evaluateHandler;
 
   IndexNode({
     String debugLabel,
-    EvaluationType evaluationType = EvaluationType.ALL_INPUTS,
-    NodeEvaluator<S> evaluateHandler,
+    EvaluationType evaluationType = EvaluationType.allInputs,
+    IndexNodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
-  }) : super(
+  })  : _evaluateHandler = evaluateHandler,
+        super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
-          evaluateHandler: evaluateHandler,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
         );
 
-  bool isLinked(int index) => _sourceIndexes.length > index;
+  void link(Iterable<Node> sources) {
+    if (isLinked) {
+      throw StateError('Sources already linked');
+    }
 
-  // TODO link iterable
-  void link(Node source) {
-    _linkSource(_id, source);
-    _sourceIndexes.add(_id);
-    _id++;
+    for (final source in sources) {
+      _linkSource(_sourceReferences.length, source);
+    }
   }
 
-  // TODO unlinkall
   void unlink() {
-    _unlinkSource(_sourceIndexes.removeLast());
-    _id--;
+    while (isLinked) {
+      _unlinkSource(_sourceReferences.keys.last);
+    }
   }
 
   @override
   void onUnreferenced() {
-    while (_sourceIndexes.isNotEmpty) {
-      unlink();
-    }
+    unlink();
 
     super.onUnreferenced();
   }
+
+  @override
+  NodeEvaluationList _createEvaluationInputs(
+          Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries) =>
+      NodeEvaluationList(inputEntries.map((entry) => entry.value != null
+          ? entry
+          : MapEntry(entry.key, NodeEvaluation<S>.not())));
+
+  @override
+  NodeEvaluation<S> _evaluate(NodeEvaluationList inputs) =>
+      _evaluateHandler(inputs);
 }
 
 class KeyNode<S> extends Node<S> {
+  final KeyNodeEvaluator<S> _evaluateHandler;
+
   KeyNode({
     String debugLabel,
-    EvaluationType evaluationType = EvaluationType.ALL_INPUTS,
-    NodeEvaluator<S> evaluateHandler,
+    EvaluationType evaluationType = EvaluationType.allInputs,
+    KeyNodeEvaluator<S> evaluateHandler,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
-  }) : super(
+  })  : _evaluateHandler = evaluateHandler,
+        super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
-          evaluateHandler: evaluateHandler,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
         );
 
-  void link(key, Node source) => _linkSource(key, source);
+  bool isLinkedKey({key}) =>
+      _sourceReferences.containsKey(key ?? defaultEvaluationKey);
 
-  void unlink(key) => _unlinkSource(key);
+  void link(Node source, {key}) {
+    if (isLinkedKey(key: key)) {
+      throw StateError('Source on $key already linked');
+    }
+
+    _linkSource(key ?? defaultEvaluationKey, source);
+  }
+
+  void unlink({key}) => _unlinkSource(key ?? defaultEvaluationKey);
 
   @override
   void onUnreferenced() {
-    while (_sourceReferences.isNotEmpty) {
-      unlink(_sourceReferences.keys.last);
+    while (isLinked) {
+      unlink(key: _sourceReferences.keys.last);
     }
 
     super.onUnreferenced();
   }
+
+  @override
+  NodeEvaluationMap _createEvaluationInputs(
+          Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries) =>
+      NodeEvaluationMap(inputEntries.map((entry) => entry.value != null
+          ? entry
+          : MapEntry(entry.key, NodeEvaluation<S>.not())));
+
+  @override
+  NodeEvaluation<S> _evaluate(NodeEvaluationMap inputs) =>
+      _evaluateHandler(inputs);
 }

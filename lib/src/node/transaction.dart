@@ -3,6 +3,7 @@ import 'dart:collection';
 
 import '../reference.dart';
 import '../node.dart';
+
 import 'node_evaluation.dart';
 
 typedef TransactionHandler = void Function(Transaction transaction);
@@ -83,13 +84,11 @@ class Transaction {
   }
 
   static void addNode(Node node) => Transaction.runRequired((transaction) {
-        final reference = Reference(node);
+        transaction.reference(node);
 
-        if (reference.value.evaluationType == EvaluationType.FIRST_EVALUATION) {
-          transaction._firstNodes.add(reference.value);
+        if (node.evaluationType == EvaluationType.firstEvaluation) {
+          transaction._firstNodes.add(node);
         }
-
-        transaction._referenceGroup.add(reference);
       });
 
   static void removeNode(Node node) {
@@ -115,11 +114,8 @@ class Transaction {
 
   TransactionPhase get phase => _phase;
 
-  N node<N extends Node>(N node) {
-    _referenceGroup.add(Reference(node));
-
-    return node;
-  }
+  void reference<R extends Referenceable>(Node node) =>
+      _referenceGroup.add(Reference(node));
 
   void addClosingTransactionHandler(
           Node node, TransactionHandler transactionHandler) =>
@@ -190,21 +186,19 @@ class Transaction {
 
   void _evaluateNode(Node node, {bool forceEvaluation = false}) {
     if (!_evaluations.containsKey(node)) {
-      bool allInputsEvaluated = true;
-      final inputMap = <dynamic, NodeEvaluation>{};
-      for (final entry in nodeGraph.getSourceReferencesNodes(node).entries) {
-        NodeEvaluation evaluation;
-        if (_evaluations.containsKey(entry.value.value)) {
-          evaluation = _evaluations[entry.value.value];
-        } else {
-          allInputsEvaluated = false;
-          evaluation = nodeGraph.createNodeEvaluationNot(entry.value.value);
-        }
-        inputMap[entry.key] = evaluation;
-      }
+      final inputs = nodeGraph.createEvaluationInputs(
+          node,
+          nodeGraph
+              .getSourceReferencesNodes(node)
+              .entries
+              .map<MapEntry<dynamic, NodeEvaluation>>((entry) => MapEntry(
+                  entry.key,
+                  _evaluations.containsKey(entry.value.value)
+                      ? _evaluations[entry.value.value]
+                      : null)));
 
-      if (forceEvaluation || allInputsEvaluated) {
-        final evaluation = nodeGraph.evaluate(node, inputMap);
+      if (forceEvaluation || inputs.allInputsEvaluated) {
+        final evaluation = nodeGraph.evaluate(node, inputs);
 
         if (evaluation.isEvaluated) {
           _evaluations[node] = evaluation;

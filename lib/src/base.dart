@@ -1,5 +1,5 @@
-import 'package:frappe/src/node.dart';
-import 'package:frappe/src/reference.dart';
+import 'node.dart';
+import 'reference.dart';
 
 void cleanUp() {
   cleanAllNodesUnlinked();
