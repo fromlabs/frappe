@@ -184,7 +184,7 @@ class ValueState<V> {
   ValueState._(LazyValue<V> lazyInitValue, this._stream)
       : _currentLazyValue = lazyInitValue {
     if (lazyInitValue.hasValue) {
-      _initCurrentValueReference(lazyInitValue.get());
+      _updateCurrentValueReference(lazyInitValue.get());
     }
 
     nodeGraph.overrideCommit<V>(_node, (superCommit, value) {
@@ -192,26 +192,10 @@ class ValueState<V> {
 
       if (!_currentLazyValue.hasValue ||
           !identical(value, _currentLazyValue.get())) {
-        final currentValueReference = _currentValueReference;
-
         _currentLazyValue = LazyValue(value);
-        _initCurrentValueReference(value);
-
-        currentValueReference?.dispose();
+        _updateCurrentValueReference(value);
       }
     });
-  }
-
-  void _initCurrentValueReference(V value) {
-    if (value is EventStream) {
-      _currentValueReference = _node.reference(getEventStreamNode(value));
-    } else if (value is ValueState) {
-      _currentValueReference = _node.reference(value._node);
-    } else if (value is Referenceable) {
-      _currentValueReference = _node.reference(value);
-    } else {
-      _currentValueReference = null;
-    }
   }
 
   static ValueState<VR> combines<VR>(
@@ -383,6 +367,20 @@ class ValueState<V> {
       ValueState.switchStream<ER>(map<EventStream<ER>>(mapper));
 
   Node<V> get _node => getEventStreamNode(_stream);
+
+  void _updateCurrentValueReference(V value) {
+    _currentValueReference?.dispose();
+
+    if (value is EventStream) {
+      _currentValueReference = _node.reference(getEventStreamNode(value));
+    } else if (value is ValueState) {
+      _currentValueReference = _node.reference(value._node);
+    } else if (value is Referenceable) {
+      _currentValueReference = _node.reference(value);
+    } else {
+      _currentValueReference = null;
+    }
+  }
 }
 
 class OptionalValueState<V> extends ValueState<Optional<V>> {

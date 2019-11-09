@@ -77,7 +77,6 @@ void main() {
       sink.close();
     });
 
-    // TODO risolvere errori
     test('Test 04', () {
       final sink = ValueStateSink<int>(-1);
 

@@ -19,9 +19,10 @@ class ReferenceGroup {
 
   bool _isDisposed = false;
 
-  Reference<R> reference<R>(R value) => add(Reference(value));
+  Reference<R> reference<R extends Referenceable>(R referenceable) =>
+      add(Reference(referenceable));
 
-  Reference<R> add<R>(Reference<R> reference) {
+  Reference<R> add<R extends Referenceable>(Reference<R> reference) {
     _checkDisposed();
 
     _references.add(reference);
@@ -56,17 +57,15 @@ class ReferenceGroup {
   }
 }
 
-class Reference<R> {
+class Reference<R extends Referenceable> {
   final R value;
 
   bool _isDisposed = false;
 
-  Reference(R value) : this.value = value {
+  Reference(this.value) {
     ArgumentError.checkNotNull(value, 'value');
 
-    if (value is Referenceable) {
-      _registerReference<Referenceable>(value);
-    }
+    _registerReference();
   }
 
   bool get isDisposed => _isDisposed;
@@ -76,10 +75,7 @@ class Reference<R> {
 
     _isDisposed = true;
 
-    final value = this.value;
-    if (value is Referenceable) {
-      _unregisterReference<Referenceable>(value);
-    }
+    _unregisterReference();
   }
 
   @override
@@ -91,13 +87,13 @@ class Reference<R> {
     }
   }
 
-  void _registerReference<RR extends Referenceable>(RR value) {
+  void _registerReference() {
     _globalReferences.putIfAbsent(value, () => Set.identity()).add(this);
 
     value._refresh();
   }
 
-  void _unregisterReference<RR extends Referenceable>(RR value) {
+  void _unregisterReference() {
     final references = _globalReferences[value];
     references.remove(this);
     if (references.isEmpty) {
@@ -108,14 +104,14 @@ class Reference<R> {
   }
 }
 
-class HostedReference<R> extends Reference<R> {
+class HostedReference<R extends Referenceable> extends Reference<R> {
   final Referenceable _host;
 
   HostedReference(this._host, R value) : super(value) {
     ArgumentError.checkNotNull(_host, 'host');
 
     if (!_host.isReferenced) {
-      throw ArgumentError('Unreferenced host: $_host');
+      throw ArgumentError('Unreferenced host');
     }
   }
 
@@ -123,10 +119,10 @@ class HostedReference<R> extends Reference<R> {
   String toString() => '#$_host.$value';
 
   @override
-  void _unregisterReference<RR extends Referenceable>(RR value) {
+  void _unregisterReference() {
     _host._removeHostedReference(this);
 
-    super._unregisterReference(value);
+    super._unregisterReference();
   }
 }
 
@@ -139,7 +135,7 @@ abstract class Referenceable {
 
   bool get isUnreferenced => !_isReferenced;
 
-  HostedReference<R> reference<R>(R value) {
+  HostedReference<R> reference<R extends Referenceable>(R value) {
     _hostedGroup._checkDisposed();
 
     return _hostedGroup.add(HostedReference(this, value));
