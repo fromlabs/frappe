@@ -26,6 +26,7 @@ void assertAllListenNodes() {
 class Transaction {
   static const String _transactionZoneParameter = 'transaction';
 
+  static final Set<Node> _globalAlwaysNodes = Set.identity();
   static final Map<Node, TransactionHandler> _globalListenNodes =
       Map.identity();
 
@@ -47,8 +48,10 @@ class Transaction {
 
   static init() {
     _isInitialized = true;
-    nodeGraph.addNodeHandler = Transaction.addNode;
-    nodeGraph.removeNodeHandler = Transaction.removeNode;
+    nodeGraph.onNodeAddedHandler = Transaction.onNodeAdded;
+    nodeGraph.onNodeRemovedHandler = Transaction.onNodeRemoved;
+    nodeGraph.onEvaluationTypeUpdatedHandler =
+        Transaction.onEvaluationTypeUpdated;
   }
 
   static T runRequired<T>(TransactionRunner<T> runner) =>
@@ -83,23 +86,40 @@ class Transaction {
     }
   }
 
-  static void addNode(Node node) => Transaction.runRequired((transaction) {
+  static void onNodeAdded(Node node) => Transaction.runRequired((transaction) {
         transaction.reference(node);
 
-        if (node.evaluationType == EvaluationType.firstEvaluation) {
-          transaction._firstNodes.add(node);
+        if (node.evaluationType == EvaluationType.always) {
+          _globalAlwaysNodes.add(node);
         }
       });
 
-  static void removeNode(Node node) {
+  static void onNodeRemoved(Node node) {
+    _globalAlwaysNodes.remove(node);
     _globalListenNodes.remove(node);
   }
+
+  static void onEvaluationTypeUpdated(
+      Node node, EvaluationType newValue, EvaluationType oldValue) {
+    if (oldValue == EvaluationType.always) {
+      _globalAlwaysNodes.remove(node);
+    }
+
+    if (node.evaluationType == EvaluationType.always) {
+      _globalAlwaysNodes.add(node);
+    }
+  }
+
+  static void addClosingTransactionHandler(
+          Node node, TransactionHandler transactionHandler) =>
+      _globalListenNodes[node] = transactionHandler;
+
+  static void removeClosingTransactionHandler(Node node) =>
+      _globalListenNodes.remove(node);
 
   final ReferenceGroup _referenceGroup = ReferenceGroup();
 
   final Map<Node, NodeEvaluation> _evaluations = Map.identity();
-
-  final Set<Node> _firstNodes = Set.identity();
 
   final Set<Node> _pendingNodes = SplayTreeSet<Node>(
       (node1, node2) => node2.evaluationPriority - node1.evaluationPriority);
@@ -116,10 +136,6 @@ class Transaction {
 
   void reference<R extends Referenceable>(Node node) =>
       _referenceGroup.add(Reference(node));
-
-  void addClosingTransactionHandler(
-          Node node, TransactionHandler transactionHandler) =>
-      _globalListenNodes[node] = transactionHandler;
 
   // TODO gestione delle eccezioni con handler in transaction
   void onError(Object error, StackTrace stacktrace) =>
@@ -160,7 +176,7 @@ class Transaction {
   void _evaluate() {
     _phase = TransactionPhase.EVALUATION;
 
-    _pendingNodes.addAll(_firstNodes);
+    _pendingNodes.addAll(_globalAlwaysNodes);
 
     for (final sourceNode in List.of(_evaluations.keys)) {
       _evaluateTargetNodes(sourceNode);
@@ -170,7 +186,7 @@ class Transaction {
   }
 
   void _evaluateTargetNodes(Node sourceNode) {
-    for (final targetNode in nodeGraph.getTargetNodes(sourceNode).keys) {
+    for (final targetNode in sourceNode.targetNodes.keys) {
       _evaluateNode(targetNode);
     }
   }
@@ -185,17 +201,14 @@ class Transaction {
   }
 
   void _evaluateNode(Node node, {bool forceEvaluation = false}) {
-    if (!_evaluations.containsKey(node)) {
-      final inputs = nodeGraph.createEvaluationInputs(
-          node,
-          nodeGraph
-              .getSourceReferencesNodes(node)
-              .entries
-              .map<MapEntry<dynamic, NodeEvaluation>>((entry) => MapEntry(
-                  entry.key,
-                  _evaluations.containsKey(entry.value.value)
-                      ? _evaluations[entry.value.value]
-                      : null)));
+    if (!_evaluations.containsKey(node) &&
+        node.evaluationType != EvaluationType.never) {
+      final inputs = node.createEvaluationInputs(node.sourceReferences.entries
+          .map<MapEntry<dynamic, NodeEvaluation>>((entry) => MapEntry(
+              entry.key,
+              _evaluations.containsKey(entry.value.value)
+                  ? _evaluations[entry.value.value]
+                  : null)));
 
       if (forceEvaluation || inputs.allInputsEvaluated) {
         final evaluation = nodeGraph.evaluate(node, inputs);
@@ -231,7 +244,7 @@ class Transaction {
   void _notifyClosingTransaction() {
     _phase = TransactionPhase.CLOSING;
 
-    for (final handler in _globalListenNodes.values) {
+    for (final handler in _globalListenNodes.values.toList()) {
       handler(this);
     }
   }

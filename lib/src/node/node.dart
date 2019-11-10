@@ -1,3 +1,5 @@
+import 'package:frappe/src/node.dart';
+
 import '../reference.dart';
 
 import 'node_evaluation_collection.dart';
@@ -6,6 +8,8 @@ import 'node_evaluation_map.dart';
 import 'node_evaluation.dart';
 
 typedef NodeHandler<V> = void Function(Node<V> node);
+typedef NodeValueUpdatedHandler<V> = void Function(
+    Node node, V newValue, V oldValue);
 typedef ValueHandler<V> = void Function(V value);
 typedef OverrideValueHandler<V> = void Function(
     ValueHandler<V> superCommit, V value);
@@ -16,13 +20,7 @@ typedef KeyNodeEvaluator<V> = NodeEvaluation<V> Function(
 typedef IndexNodeEvaluator<V> = NodeEvaluation<V> Function(
     NodeEvaluationList inputs);
 
-enum EvaluationType {
-  always,
-  allInputs,
-  almostOneInput,
-  firstEvaluation,
-  never
-}
+enum EvaluationType { always, allInputs, almostOneInput, never }
 
 final nodeGraph = _NodeGraph();
 
@@ -34,13 +32,10 @@ class _NodeGraph {
   final Set<Node> _globalTargetNodes = Set.identity();
   final Set<Node> _globalSourceNodes = Set.identity();
 
-  NodeHandler addNodeHandler = (Node node) {};
-  NodeHandler removeNodeHandler = (Node node) {};
-
-  Map<Node, Set> getTargetNodes(Node node) => node._targetNodes;
-
-  Map<dynamic, HostedReference<Node>> getSourceReferencesNodes(Node node) =>
-      node._sourceReferences;
+  NodeHandler onNodeAddedHandler = (_) {};
+  NodeHandler onNodeRemovedHandler = (_) {};
+  NodeValueUpdatedHandler<EvaluationType> onEvaluationTypeUpdatedHandler =
+      (_, __, ___) {};
 
   void cleanAllNodesUnlinked() {
     _globalSourceNodes.clear();
@@ -54,14 +49,6 @@ class _NodeGraph {
 
       throw AssertionError('Not all nodes unlinked');
     }
-  }
-
-  void addNode(Node node) {
-    addNodeHandler(node);
-  }
-
-  void removeNode(Node node) {
-    removeNodeHandler(node);
   }
 
   void addTargetNode(Node node) {
@@ -88,7 +75,7 @@ class _NodeGraph {
 
   void publish<S>(Node<S> node, S value) => node._publish(value);
 
-  void overrideCommit<S>(
+  void overrideCommitHandler<S>(
       Node<S> node, OverrideValueHandler<S> overrideCommitHandler) {
     final superCommitHandler = node._commitHandler;
 
@@ -96,27 +83,32 @@ class _NodeGraph {
         (S value) => overrideCommitHandler(superCommitHandler, value);
   }
 
-  NodeEvaluationCollection createEvaluationInputs(Node node,
-          Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries) =>
-      node._createEvaluationInputs(inputEntries);
+  void onNodeAdded(Node node) => onNodeAddedHandler(node);
+
+  void onNodeRemoved(Node node) => onNodeRemovedHandler(node);
+
+  void onEvaluationTypeUpdated(Node node, EvaluationType newEvaluationType,
+          EvaluationType oldEvaluationType) =>
+      onEvaluationTypeUpdatedHandler(
+          node, newEvaluationType, oldEvaluationType);
 }
 
 abstract class Node<S> extends Referenceable {
   static int _nodeId = 0;
 
-  final EvaluationType evaluationType;
-
   final String debugLabel;
 
-  final Map<dynamic, HostedReference<Node>> _sourceReferences = Map.identity();
+  final Map<dynamic, HostedReference<Node>> sourceReferences = Map.identity();
 
-  final Map<Node, Set> _targetNodes = Map.identity();
+  final Map<Node, Set> targetNodes = Map.identity();
+
+  EvaluationType _evaluationType;
+
+  int _evaluationPriority;
 
   ValueHandler<S> _commitHandler;
 
   ValueHandler<S> _publishHandler;
-
-  int _evaluationPriority;
 
   Node({
     String debugLabel,
@@ -124,28 +116,44 @@ abstract class Node<S> extends Referenceable {
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
   })  : debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
-        this.evaluationType = evaluationType {
+        _evaluationType = evaluationType {
     _commitHandler = commitHandler ?? (S value) {};
     _publishHandler = publishHandler ?? (S value) {};
-    _evaluationPriority = evaluationType == EvaluationType.allInputs ? 0 : 1;
+    _evaluationPriority = 1;
 
-    nodeGraph.addNode(this);
+    nodeGraph.onNodeAdded(this);
+  }
+
+  EvaluationType get evaluationType => _evaluationType;
+
+  set evaluationType(EvaluationType evaluationType) {
+    if (evaluationType != _evaluationType) {
+      final oldEvaluationType = _evaluationType;
+
+      _evaluationType = evaluationType;
+
+      nodeGraph.onEvaluationTypeUpdated(
+          this, evaluationType, oldEvaluationType);
+    }
   }
 
   int get evaluationPriority => _evaluationPriority;
 
-  bool get isLinked => _sourceReferences.isNotEmpty;
+  bool get isLinked => sourceReferences.isNotEmpty;
+
+  NodeEvaluationCollection createEvaluationInputs(
+      Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries);
 
   @override
   void onUnreferenced() {
-    nodeGraph.removeNode(this);
+    nodeGraph.onNodeRemoved(this);
 
     super.onUnreferenced();
   }
 
   @override
   String toString() =>
-      '[$debugLabel:$runtimeType:${isReferenced ? 'REFERENCED' : 'UNREFERENCED'}:$_evaluationPriority]';
+      '[$debugLabel:$runtimeType:$_evaluationType:$_evaluationPriority]';
 
   void _linkSource(key, Node source) {
     assert(key != null);
@@ -158,17 +166,17 @@ abstract class Node<S> extends Referenceable {
 
     source._checkCycle(this);
     final sourceReference = reference(source);
-    if (_sourceReferences.isEmpty) {
+    if (sourceReferences.isEmpty) {
       nodeGraph.addTargetNode(this);
     }
-    _sourceReferences[key] = sourceReference;
+    sourceReferences[key] = sourceReference;
     source._linkTarget(this, key);
   }
 
   void _unlinkSource(key) {
-    final sourceReference = _sourceReferences.remove(key);
+    final sourceReference = sourceReferences.remove(key);
     if (sourceReference != null) {
-      if (_sourceReferences.isEmpty) {
+      if (sourceReferences.isEmpty) {
         nodeGraph.removeTargetNode(this);
       }
       sourceReference.dispose();
@@ -177,21 +185,21 @@ abstract class Node<S> extends Referenceable {
   }
 
   void _linkTarget(Node target, key) {
-    if (_targetNodes.isEmpty) {
+    if (targetNodes.isEmpty) {
       nodeGraph.addSourceNode(this);
     }
-    _targetNodes.putIfAbsent(target, () => Set.identity()).add(key);
+    targetNodes.putIfAbsent(target, () => Set.identity()).add(key);
 
     _propagatePriority(target._evaluationPriority);
   }
 
   void _unlinkTarget(Node target, key) {
-    final keys = _targetNodes[target];
+    final keys = targetNodes[target];
     if (keys != null) {
       keys.remove(key);
       if (keys.isEmpty) {
-        _targetNodes.remove(target);
-        if (_targetNodes.isEmpty) {
+        targetNodes.remove(target);
+        if (targetNodes.isEmpty) {
           nodeGraph.removeSourceNode(this);
         }
       }
@@ -202,7 +210,7 @@ abstract class Node<S> extends Referenceable {
 
   void _checkCycle(Node ascendant) {
     if (ascendant != this) {
-      for (final sourceReference in _sourceReferences.values) {
+      for (final sourceReference in sourceReferences.values) {
         sourceReference.value._checkCycle(ascendant);
       }
     } else {
@@ -213,14 +221,11 @@ abstract class Node<S> extends Referenceable {
   void _propagatePriority(int evaluationPriority) {
     if (evaluationPriority > 0) {
       _evaluationPriority += evaluationPriority;
-      for (final sourceReference in _sourceReferences.values) {
+      for (final sourceReference in sourceReferences.values) {
         sourceReference.value._propagatePriority(evaluationPriority);
       }
     }
   }
-
-  NodeEvaluationCollection _createEvaluationInputs(
-      Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries);
 
   NodeEvaluation<S> _evaluate(covariant NodeEvaluationCollection inputs);
 
@@ -252,13 +257,13 @@ class IndexNode<S> extends Node<S> {
     }
 
     for (final source in sources) {
-      _linkSource(_sourceReferences.length, source);
+      _linkSource(sourceReferences.length, source);
     }
   }
 
   void unlink() {
     while (isLinked) {
-      _unlinkSource(_sourceReferences.keys.last);
+      _unlinkSource(sourceReferences.keys.last);
     }
   }
 
@@ -270,7 +275,7 @@ class IndexNode<S> extends Node<S> {
   }
 
   @override
-  NodeEvaluationList _createEvaluationInputs(
+  NodeEvaluationList createEvaluationInputs(
           Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries) =>
       NodeEvaluationList(inputEntries.map((entry) => entry.value != null
           ? entry
@@ -299,7 +304,7 @@ class KeyNode<S> extends Node<S> {
         );
 
   bool isLinkedKey({key}) =>
-      _sourceReferences.containsKey(key ?? defaultEvaluationKey);
+      sourceReferences.containsKey(key ?? defaultEvaluationKey);
 
   void link(Node source, {key}) {
     if (isLinkedKey(key: key)) {
@@ -314,14 +319,14 @@ class KeyNode<S> extends Node<S> {
   @override
   void onUnreferenced() {
     while (isLinked) {
-      unlink(key: _sourceReferences.keys.last);
+      unlink(key: sourceReferences.keys.last);
     }
 
     super.onUnreferenced();
   }
 
   @override
-  NodeEvaluationMap _createEvaluationInputs(
+  NodeEvaluationMap createEvaluationInputs(
           Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries) =>
       NodeEvaluationMap(inputEntries.map((entry) => entry.value != null
           ? entry

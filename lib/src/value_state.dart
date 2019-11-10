@@ -187,7 +187,7 @@ class ValueState<V> {
       _updateCurrentValueReference(lazyInitValue.get());
     }
 
-    nodeGraph.overrideCommit<V>(_node, (superCommit, value) {
+    nodeGraph.overrideCommitHandler<V>(_node, (superCommit, value) {
       superCommit(value);
 
       if (!_currentLazyValue.hasValue ||
@@ -226,7 +226,7 @@ class ValueState<V> {
 
         targetNode = KeyNode<V>(evaluateHandler: _defaultEvaluateHandler);
 
-        transaction.addClosingTransactionHandler(targetNode, (transaction) {
+        Transaction.addClosingTransactionHandler(targetNode, (transaction) {
           if (transaction.hasValue(getValueStateNode(statesState))) {
             targetNode.unlink();
             targetNode.link(getValueStateNode(statesState.current()));
@@ -248,7 +248,7 @@ class ValueState<V> {
 
         targetNode = KeyNode<E>(evaluateHandler: _defaultEvaluateHandler);
 
-        transaction.addClosingTransactionHandler(targetNode, (transaction) {
+        Transaction.addClosingTransactionHandler(targetNode, (transaction) {
           if (transaction.hasValue(getValueStateNode(streamsState))) {
             targetNode.unlink();
             targetNode.link(getEventStreamNode(streamsState.current()));
@@ -278,10 +278,16 @@ class ValueState<V> {
 
   EventStream<V> toValues() => Transaction.runRequired((transaction) {
         final targetNode = KeyNode<V>(
-            evaluationType: EvaluationType.firstEvaluation,
+            evaluationType: EvaluationType.always,
             evaluateHandler: (inputs) => inputs.evaluation.isEvaluated
                 ? inputs.evaluation
                 : NodeEvaluation(current()));
+
+        Transaction.addClosingTransactionHandler(targetNode, (transaction) {
+          targetNode.evaluationType = EvaluationType.allInputs;
+
+          Transaction.removeClosingTransactionHandler(targetNode);
+        });
 
         targetNode.link(_node);
 

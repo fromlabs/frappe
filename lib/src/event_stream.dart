@@ -183,11 +183,12 @@ class EventStream<E> {
       Transaction.runRequired((_) => createValueState(lazyInitValue, this));
 
   EventStream<E> once() => Transaction.runRequired((transaction) {
-        var neverEvaluated = true;
-        final targetNode = KeyNode<E>(
-          evaluateHandler: (inputs) =>
-              neverEvaluated ? inputs.evaluation : NodeEvaluation.not(),
-          commitHandler: (_) => neverEvaluated = false,
+        KeyNode<E> targetNode;
+
+        targetNode = KeyNode<E>(
+          evaluateHandler: _defaultEvaluateHandler,
+          commitHandler: (_) =>
+              targetNode.evaluationType = EvaluationType.never,
         );
 
         targetNode.link(_node);
