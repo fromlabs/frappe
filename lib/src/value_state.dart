@@ -187,15 +187,17 @@ class ValueState<V> {
       _updateCurrentValueReference(lazyInitValue.get());
     }
 
-    nodeGraph.overrideCommitHandler<V>(_node, (superCommit, value) {
-      superCommit(value);
+    final superCommitHandler = _node.commitHandler;
+
+    _node.commitHandler = (V value) {
+      superCommitHandler(value);
 
       if (!_currentLazyValue.hasValue ||
           !identical(value, _currentLazyValue.get())) {
         _currentLazyValue = LazyValue(value);
         _updateCurrentValueReference(value);
       }
-    });
+    };
   }
 
   static ValueState<VR> combines<VR>(

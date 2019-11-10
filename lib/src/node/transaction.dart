@@ -48,10 +48,9 @@ class Transaction {
 
   static init() {
     _isInitialized = true;
-    nodeGraph.onNodeAddedHandler = Transaction.onNodeAdded;
-    nodeGraph.onNodeRemovedHandler = Transaction.onNodeRemoved;
-    nodeGraph.onEvaluationTypeUpdatedHandler =
-        Transaction.onEvaluationTypeUpdated;
+    Node.onNodeAddedHandler = Transaction.onNodeAdded;
+    Node.onNodeRemovedHandler = Transaction.onNodeRemoved;
+    Node.onEvaluationTypeUpdatedHandler = Transaction.onEvaluationTypeUpdated;
   }
 
   static T runRequired<T>(TransactionRunner<T> runner) =>
@@ -211,7 +210,7 @@ class Transaction {
                   : null)));
 
       if (forceEvaluation || inputs.allInputsEvaluated) {
-        final evaluation = nodeGraph.evaluate(node, inputs);
+        final evaluation = node.evaluate(inputs);
 
         if (evaluation.isEvaluated) {
           _evaluations[node] = evaluation;
@@ -229,7 +228,7 @@ class Transaction {
     _phase = TransactionPhase.COMMIT;
 
     for (final entry in _evaluations.entries) {
-      nodeGraph.commit(entry.key, entry.value.value);
+      entry.key.commit(entry.value.value);
     }
   }
 
@@ -237,7 +236,7 @@ class Transaction {
     _phase = TransactionPhase.PUBLISH;
 
     for (final entry in _evaluations.entries) {
-      nodeGraph.publish(entry.key, entry.value.value);
+      entry.key.publish(entry.value.value);
     }
   }
 

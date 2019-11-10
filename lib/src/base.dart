@@ -2,13 +2,13 @@ import 'node.dart';
 import 'reference.dart';
 
 void cleanUp() {
-  cleanAllNodesUnlinked();
+  Node.cleanAllNodesUnlinked();
   cleanAllListenNodes();
   cleanAllUnreferenced();
 }
 
 void assertCleanup() {
-  assertAllNodesUnlinked();
+  Node.assertAllNodesUnlinked();
   assertAllListenNodes();
   assertAllUnreferenced();
 }

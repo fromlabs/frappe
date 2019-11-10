@@ -22,27 +22,22 @@ typedef IndexNodeEvaluator<V> = NodeEvaluation<V> Function(
 
 enum EvaluationType { always, allInputs, almostOneInput, never }
 
-final nodeGraph = _NodeGraph();
+abstract class Node<S> extends Referenceable {
+  static int _nodeId = 0;
+  static final Set<Node> _globalTargetNodes = Set.identity();
+  static final Set<Node> _globalSourceNodes = Set.identity();
 
-void cleanAllNodesUnlinked() => nodeGraph.cleanAllNodesUnlinked();
+  static NodeHandler onNodeAddedHandler = (_) {};
+  static NodeHandler onNodeRemovedHandler = (_) {};
+  static NodeValueUpdatedHandler<EvaluationType>
+      onEvaluationTypeUpdatedHandler = (_, __, ___) {};
 
-void assertAllNodesUnlinked() => nodeGraph.assertAllNodesUnlinked();
-
-class _NodeGraph {
-  final Set<Node> _globalTargetNodes = Set.identity();
-  final Set<Node> _globalSourceNodes = Set.identity();
-
-  NodeHandler onNodeAddedHandler = (_) {};
-  NodeHandler onNodeRemovedHandler = (_) {};
-  NodeValueUpdatedHandler<EvaluationType> onEvaluationTypeUpdatedHandler =
-      (_, __, ___) {};
-
-  void cleanAllNodesUnlinked() {
+  static void cleanAllNodesUnlinked() {
     _globalSourceNodes.clear();
     _globalTargetNodes.clear();
   }
 
-  void assertAllNodesUnlinked() {
+  static void assertAllNodesUnlinked() {
     if (_globalSourceNodes.isNotEmpty || _globalTargetNodes.isNotEmpty) {
       print('Source nodes: ${_globalSourceNodes}');
       print('Target nodes: ${_globalTargetNodes}');
@@ -50,51 +45,6 @@ class _NodeGraph {
       throw AssertionError('Not all nodes unlinked');
     }
   }
-
-  void addTargetNode(Node node) {
-    _globalTargetNodes.add(node);
-  }
-
-  void removeTargetNode(Node node) {
-    _globalTargetNodes.remove(node);
-  }
-
-  void addSourceNode(Node node) {
-    _globalSourceNodes.add(node);
-  }
-
-  void removeSourceNode(Node node) {
-    _globalSourceNodes.remove(node);
-  }
-
-  NodeEvaluation<S> evaluate<S>(
-          Node<S> node, NodeEvaluationCollection inputs) =>
-      node._evaluate(inputs);
-
-  void commit<S>(Node<S> node, S value) => node._commit(value);
-
-  void publish<S>(Node<S> node, S value) => node._publish(value);
-
-  void overrideCommitHandler<S>(
-      Node<S> node, OverrideValueHandler<S> overrideCommitHandler) {
-    final superCommitHandler = node._commitHandler;
-
-    node._commitHandler =
-        (S value) => overrideCommitHandler(superCommitHandler, value);
-  }
-
-  void onNodeAdded(Node node) => onNodeAddedHandler(node);
-
-  void onNodeRemoved(Node node) => onNodeRemovedHandler(node);
-
-  void onEvaluationTypeUpdated(Node node, EvaluationType newEvaluationType,
-          EvaluationType oldEvaluationType) =>
-      onEvaluationTypeUpdatedHandler(
-          node, newEvaluationType, oldEvaluationType);
-}
-
-abstract class Node<S> extends Referenceable {
-  static int _nodeId = 0;
 
   final String debugLabel;
 
@@ -106,9 +56,9 @@ abstract class Node<S> extends Referenceable {
 
   int _evaluationPriority;
 
-  ValueHandler<S> _commitHandler;
+  ValueHandler<S> commitHandler;
 
-  ValueHandler<S> _publishHandler;
+  ValueHandler<S> publishHandler;
 
   Node({
     String debugLabel,
@@ -117,11 +67,11 @@ abstract class Node<S> extends Referenceable {
     ValueHandler<S> publishHandler,
   })  : debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
         _evaluationType = evaluationType {
-    _commitHandler = commitHandler ?? (S value) {};
-    _publishHandler = publishHandler ?? (S value) {};
+    this.commitHandler = commitHandler ?? (S value) {};
+    this.publishHandler = publishHandler ?? (S value) {};
     _evaluationPriority = 1;
 
-    nodeGraph.onNodeAdded(this);
+    onNodeAddedHandler(this);
   }
 
   EvaluationType get evaluationType => _evaluationType;
@@ -132,8 +82,7 @@ abstract class Node<S> extends Referenceable {
 
       _evaluationType = evaluationType;
 
-      nodeGraph.onEvaluationTypeUpdated(
-          this, evaluationType, oldEvaluationType);
+      onEvaluationTypeUpdatedHandler(this, evaluationType, oldEvaluationType);
     }
   }
 
@@ -146,10 +95,16 @@ abstract class Node<S> extends Referenceable {
 
   @override
   void onUnreferenced() {
-    nodeGraph.onNodeRemoved(this);
+    onNodeRemovedHandler(this);
 
     super.onUnreferenced();
   }
+
+  NodeEvaluation<S> evaluate(covariant NodeEvaluationCollection inputs);
+
+  void commit(S value) => commitHandler(value);
+
+  void publish(S value) => publishHandler(value);
 
   @override
   String toString() =>
@@ -167,7 +122,7 @@ abstract class Node<S> extends Referenceable {
     source._checkCycle(this);
     final sourceReference = reference(source);
     if (sourceReferences.isEmpty) {
-      nodeGraph.addTargetNode(this);
+      _globalTargetNodes.add(this);
     }
     sourceReferences[key] = sourceReference;
     source._linkTarget(this, key);
@@ -177,7 +132,7 @@ abstract class Node<S> extends Referenceable {
     final sourceReference = sourceReferences.remove(key);
     if (sourceReference != null) {
       if (sourceReferences.isEmpty) {
-        nodeGraph.removeTargetNode(this);
+        _globalTargetNodes.remove(this);
       }
       sourceReference.dispose();
       sourceReference.value._unlinkTarget(this, key);
@@ -186,7 +141,7 @@ abstract class Node<S> extends Referenceable {
 
   void _linkTarget(Node target, key) {
     if (targetNodes.isEmpty) {
-      nodeGraph.addSourceNode(this);
+      _globalSourceNodes.add(this);
     }
     targetNodes.putIfAbsent(target, () => Set.identity()).add(key);
 
@@ -200,7 +155,7 @@ abstract class Node<S> extends Referenceable {
       if (keys.isEmpty) {
         targetNodes.remove(target);
         if (targetNodes.isEmpty) {
-          nodeGraph.removeSourceNode(this);
+          _globalSourceNodes.remove(this);
         }
       }
 
@@ -226,12 +181,6 @@ abstract class Node<S> extends Referenceable {
       }
     }
   }
-
-  NodeEvaluation<S> _evaluate(covariant NodeEvaluationCollection inputs);
-
-  void _commit(S value) => _commitHandler(value);
-
-  void _publish(S value) => _publishHandler(value);
 }
 
 class IndexNode<S> extends Node<S> {
@@ -282,7 +231,7 @@ class IndexNode<S> extends Node<S> {
           : MapEntry(entry.key, NodeEvaluation<S>.not())));
 
   @override
-  NodeEvaluation<S> _evaluate(NodeEvaluationList inputs) =>
+  NodeEvaluation<S> evaluate(NodeEvaluationList inputs) =>
       _evaluateHandler(inputs);
 }
 
@@ -333,6 +282,6 @@ class KeyNode<S> extends Node<S> {
           : MapEntry(entry.key, NodeEvaluation<S>.not())));
 
   @override
-  NodeEvaluation<S> _evaluate(NodeEvaluationMap inputs) =>
+  NodeEvaluation<S> evaluate(NodeEvaluationMap inputs) =>
       _evaluateHandler(inputs);
 }
