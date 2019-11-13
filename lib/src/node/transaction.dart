@@ -46,11 +46,13 @@ class Transaction {
         : null;
   }
 
-  static init() {
-    _isInitialized = true;
-    Node.onNodeAddedHandler = Transaction.onNodeAdded;
-    Node.onNodeRemovedHandler = Transaction.onNodeRemoved;
-    Node.onEvaluationTypeUpdatedHandler = Transaction.onEvaluationTypeUpdated;
+  static void init() {
+    if (!_isInitialized) {
+      _isInitialized = true;
+      Node.onNodeAddedHandler = Transaction.onNodeAdded;
+      Node.onNodeRemovedHandler = Transaction.onNodeRemoved;
+      Node.onEvaluationTypeUpdatedHandler = Transaction.onEvaluationTypeUpdated;
+    }
   }
 
   static T runRequired<T>(TransactionRunner<T> runner) =>

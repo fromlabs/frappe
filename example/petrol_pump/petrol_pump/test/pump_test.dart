@@ -48,39 +48,45 @@ void main() {
       await ListenCancelerDisposable(listenCanceler).dispose();
     }
 
+    setUpAll(() {
+      initTransaction();
+    });
+
     setUp(() {
-      fuelPulsesStreamRef = EventStreamLink<int>();
-      clearSaleStreamRef = EventStreamLink<Unit>();
-      nozzle1StreamSink = EventStreamSink<UpDown>();
-      nozzle2StreamSink = EventStreamSink<UpDown>();
-      nozzle3StreamSink = EventStreamSink<UpDown>();
-      keypadStreamSink = EventStreamSink<NumericKey>();
-      calibrationStateSink = ValueStateSink<double>(0.001);
-      price1StateSink = ValueStateSink<double>(2.149);
-      price2StateSink = ValueStateSink<double>(2.341);
-      price3StateSink = ValueStateSink<double>(1.499);
+      runTransaction(() {
+        fuelPulsesStreamRef = EventStreamLink<int>();
+        clearSaleStreamRef = EventStreamLink<Unit>();
+        nozzle1StreamSink = EventStreamSink<UpDown>();
+        nozzle2StreamSink = EventStreamSink<UpDown>();
+        nozzle3StreamSink = EventStreamSink<UpDown>();
+        keypadStreamSink = EventStreamSink<NumericKey>();
+        calibrationStateSink = ValueStateSink<double>(0.001);
+        price1StateSink = ValueStateSink<double>(2.149);
+        price2StateSink = ValueStateSink<double>(2.341);
+        price3StateSink = ValueStateSink<double>(1.499);
 
-      final pump = PresetAmountPump();
+        final pump = PresetAmountPump();
 
-      outputs = pump.create(Inputs.fromDefault((builder) => builder
-        ..nozzle1Stream = nozzle1StreamSink.stream
-        ..nozzle2Stream = nozzle2StreamSink.stream
-        ..nozzle3Stream = nozzle3StreamSink.stream
-        ..keypadStream = keypadStreamSink.stream
-        ..fuelPulsesStream = fuelPulsesStreamRef.stream
-        ..calibrationState = calibrationStateSink.state
-        ..price1State = price1StateSink.state
-        ..price2State = price2StateSink.state
-        ..price3State = price3StateSink.state
-        ..clearSaleStream = clearSaleStreamRef.stream));
+        outputs = pump.create(Inputs.fromDefault((builder) => builder
+          ..nozzle1Stream = nozzle1StreamSink.stream
+          ..nozzle2Stream = nozzle2StreamSink.stream
+          ..nozzle3Stream = nozzle3StreamSink.stream
+          ..keypadStream = keypadStreamSink.stream
+          ..fuelPulsesStream = fuelPulsesStreamRef.stream
+          ..calibrationState = calibrationStateSink.state
+          ..price1State = price1StateSink.state
+          ..price2State = price2StateSink.state
+          ..price3State = price3StateSink.state
+          ..clearSaleStream = clearSaleStreamRef.stream));
 
-      pumpEngineSimulator =
-          PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
-      fuelPulsesStreamRef.connect(pumpEngineSimulator.fuelPulsesStream);
+        pumpEngineSimulator =
+            PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
+        fuelPulsesStreamRef.connect(pumpEngineSimulator.fuelPulsesStream);
 
-      posSimulator =
-          PosSimulatorImpl(saleCompleteStream: outputs.saleCompleteStream);
-      clearSaleStreamRef.connect(posSimulator.clearSaleStream);
+        posSimulator =
+            PosSimulatorImpl(saleCompleteStream: outputs.saleCompleteStream);
+        clearSaleStreamRef.connect(posSimulator.clearSaleStream);
+      });
     });
 
     tearDown(() async {
@@ -180,8 +186,8 @@ void main() {
     void connectListeners() {
       listenCanceler = outputs.deliveryState
           .listen((e) => print('deliveryState: $e'))
-          .append(pumpLogicStateSink.state
-              .listen((e) => print('pumpLogicState: ${e.map((pump) => pump.runtimeType.toString()).orElse('none')}')))
+          .append(pumpLogicStateSink.state.listen((e) => print(
+              'pumpLogicState: ${e.map((pump) => pump.runtimeType.toString()).orElse('none')}')))
           .append(outputs.saleCostLcdState
               .listen((e) => print('saleCostLcdState: $e')))
           .append(

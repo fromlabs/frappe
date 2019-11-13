@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:frappe/frappe.dart';
 import 'package:optional/optional.dart';
 
 import 'reference.dart';
@@ -21,6 +24,19 @@ Merger<E> _defaultMergerFactory<E>() => (E value1, E value2) => value1;
 
 NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
     inputs.evaluation;
+
+class EventStreamReference<ES extends EventStream> {
+  final ES stream;
+
+  final Reference<Node> _reference;
+
+  EventStreamReference(this.stream)
+      : _reference = Reference(getEventStreamNode(stream));
+
+  bool get isDisposed => _reference.isDisposed;
+
+  void dispose() => _reference.dispose();
+}
 
 class EventStreamSink<E> {
   final EventStream<E> stream;
@@ -177,6 +193,24 @@ class EventStream<E> {
         return OptionalEventStream._(targetNode);
       });
 
+  EventStreamReference<EventStream<E>> toReference() =>
+      EventStreamReference(this);
+
+  Stream<E> toLegacyStream() {
+    StreamController<E> controller;
+    ListenSubscription subscription;
+
+    controller = StreamController<E>.broadcast(onListen: () {
+      subscription = listen(controller.add);
+    }, onCancel: () async {
+      subscription.cancel();
+
+      await controller.close();
+    });
+
+    return controller.stream;
+  }
+
   ValueState<E> toState(E initValue) => toStateLazy(LazyValue(initValue));
 
   ValueState<E> toStateLazy(LazyValue<E> lazyInitValue) =>
@@ -294,7 +328,6 @@ class EventStream<E> {
   EventStream<E> orElses(Iterable<EventStream<E>> streams) =>
       merges<E>([this, ...streams]);
 
-  // TODO creare cmq un riferimento a fromState legato a questo nodo
   EventStream<ER> snapshot<V2, ER>(
           ValueState<V2> fromState, Combiner2<E, V2, ER> combiner) =>
       Transaction.runRequired((transaction) {
@@ -351,6 +384,10 @@ class OptionalEventStream<E> extends EventStream<Optional<E>> {
   OptionalEventStream.never() : super.never();
 
   OptionalEventStream._(Node<Optional<E>> node) : super._(node);
+
+  @override
+  EventStreamReference<OptionalEventStream<E>> toReference() =>
+      EventStreamReference(this);
 
   @override
   OptionalValueState<E> toState(Optional<E> initValue) =>

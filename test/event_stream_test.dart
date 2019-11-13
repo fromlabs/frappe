@@ -1,14 +1,14 @@
 import 'dart:collection';
 
 import 'package:frappe/frappe.dart';
-import 'package:frappe/src/node.dart';
+import 'package:frappe/src/event_stream.dart';
 import 'package:frappe/src/transaction.dart';
 import 'package:optional/optional.dart';
 import 'package:test/test.dart';
 
 void main() {
   setUpAll(() {
-    Transaction.init();
+    initTransaction();
   });
 
   setUp(() {
@@ -528,6 +528,43 @@ void main() {
       sink1.close();
       sink2.close();
     });
+
+    test('Test 17', () {
+      final events1 = Queue<int>();
+
+      EventStreamSink<int> sink;
+      EventStreamReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+
+        streamReference =
+            sink.stream.map<int>((value) => 2 * value).toReference();
+      });
+
+      final subscription1 = runTransaction(() {
+        sink.send(1);
+
+        return streamReference.stream.listen((event) {
+          events1.addLast(event);
+        });
+      });
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(2));
+      expect(events1, isEmpty);
+
+      sink.send(2);
+
+      expect(events1, isNotEmpty);
+      expect(events1.removeLast(), equals(4));
+      expect(events1, isEmpty);
+
+      subscription1.cancel();
+
+      streamReference.dispose();
+      sink.close();
+    });
   });
 
   group('OptionalEventStream', () {
@@ -644,6 +681,10 @@ void main() {
 
         sink.send(Optional.of(5));
       });
+
+      final ref = sink.stream.toReference();
+
+      ref.dispose();
 
       sink.close();
     });

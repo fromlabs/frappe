@@ -1,3 +1,4 @@
+import 'package:frappe/frappe.dart';
 import 'package:optional/optional.dart';
 
 import 'reference.dart';
@@ -52,6 +53,19 @@ class LazyValue<V> {
 
   LazyValue<Optional<VV>> _castOptional<VV>() =>
       this as LazyValue<Optional<VV>>;
+}
+
+class ValueStateReference<VS extends ValueState> {
+  final VS state;
+
+  final Reference<Node> _reference;
+
+  ValueStateReference(this.state)
+      : _reference = Reference(getValueStateNode(state));
+
+  bool get isDisposed => _reference.isDisposed;
+
+  void dispose() => _reference.dispose();
 }
 
 class ValueStateSink<V> {
@@ -263,13 +277,6 @@ class ValueState<V> {
         return createEventStream(targetNode);
       });
 
-  /*
-      // TODO utilizzato dai lift di sodium
-      static ValueState<B> stateApply<A, B>(
-              ValueState<Mapper<A, B>> mapperState, ValueState<A> state) =>
-          throw UnimplementedError();
-    */
-
   V current() => Transaction.run((transaction) => currentLazy().get());
 
   LazyValue<V> currentLazy() => _currentLazyValue;
@@ -277,6 +284,8 @@ class ValueState<V> {
   OptionalValueState<VV> asOptional<VV>() =>
       Transaction.runRequired((_) => OptionalValueState._(
           currentLazy()._castOptional<VV>(), _stream.asOptional()));
+
+  ValueStateReference<ValueState<V>> toReference() => ValueStateReference(this);
 
   EventStream<V> toValues() => Transaction.runRequired((transaction) {
         final targetNode = KeyNode<V>(
@@ -405,6 +414,10 @@ class OptionalValueState<V> extends ValueState<Optional<V>> {
       : super._(lazyInitValue, stream);
 
   @override
+  OptionalValueState<VV> asOptional<VV>() =>
+      throw StateError('Already optional');
+
+  @override
   OptionalEventStream<V> toValues() =>
       Transaction.runRequired((_) => super.toValues().asOptional<V>());
 
@@ -413,8 +426,8 @@ class OptionalValueState<V> extends ValueState<Optional<V>> {
       Transaction.runRequired((_) => super.toUpdates().asOptional<V>());
 
   @override
-  OptionalValueState<VV> asOptional<VV>() =>
-      throw StateError('Already optional');
+  ValueStateReference<OptionalValueState<V>> toReference() =>
+      ValueStateReference(this);
 
   ValueState<bool> mapIsEmptyOptional() => map((value) => !value.isPresent);
 

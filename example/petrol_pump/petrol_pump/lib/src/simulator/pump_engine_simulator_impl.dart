@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 import 'package:frappe/frappe.dart';
-import 'package:petrol_pump/src/util.dart';
 
 import '../model.dart';
 import '../petrol_pump.dart';
@@ -54,16 +53,15 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
   }
 
   Future<void> _start() async {
-    // connect to delivery state
-    var subscription = _deliveryState.listen(null);
-
     final tickerTimer = PeriodicTimer(Duration(milliseconds: 200));
+
+    ListenSubscription subscription;
 
     try {
       final disposePendingState =
           _disposeStreamSink.stream.mapTo(true).toState(false);
 
-      subscription = subscription.append(tickerTimer.timerStream
+      subscription = tickerTimer.timerStream
           .gate(disposePendingState.map((pending) => !pending))
           .listen((_) {
         int pulses;
@@ -86,9 +84,9 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
         if (pulses > 0) {
           _fuelPulsesStreamSink.send(pulses);
         }
-      }));
+      });
 
-      await toLegacyStream(_disposeStreamSink.stream).first;
+      await _disposeStreamSink.stream.toLegacyStream().first;
     } finally {
       await subscription.cancel();
       await tickerTimer.dispose();

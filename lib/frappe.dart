@@ -2,6 +2,10 @@ library frappe;
 
 export 'src/base.dart' show cleanUp, assertCleanup;
 export 'src/disposable.dart';
+export 'src/listen_subscription.dart';
+export 'src/typedef.dart';
+export 'src/unit.dart';
+export 'src/transaction.dart';
 export 'src/event_stream.dart'
     show
         EventStream,
@@ -10,9 +14,6 @@ export 'src/event_stream.dart'
         OptionalEventStreamLink,
         EventStreamSink,
         OptionalEventStreamSink;
-export 'src/listen_subscription.dart';
-export 'src/typedef.dart';
-export 'src/unit.dart';
 export 'src/value_state.dart'
     show
         ValueState,

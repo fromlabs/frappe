@@ -14,7 +14,7 @@ class Keypad extends BaseObserver {
     @required EventStream<Unit> clearStream,
     @required ValueState<bool> activeState,
   }) {
-    final valueStateRef = ValueStateLink();
+    final valueStateRef = ValueStateLink<int>();
 
     final validKeyStream = keypadStream.gate(activeState);
 
