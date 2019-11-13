@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:frappe/frappe.dart';
 import 'package:optional/optional.dart';
 
@@ -195,21 +193,6 @@ class EventStream<E> {
 
   EventStreamReference<EventStream<E>> toReference() =>
       EventStreamReference(this);
-
-  Stream<E> toLegacyStream() {
-    StreamController<E> controller;
-    ListenSubscription subscription;
-
-    controller = StreamController<E>.broadcast(onListen: () {
-      subscription = listen(controller.add);
-    }, onCancel: () async {
-      subscription.cancel();
-
-      await controller.close();
-    });
-
-    return controller.stream;
-  }
 
   ValueState<E> toState(E initValue) => toStateLazy(LazyValue(initValue));
 

@@ -2,9 +2,8 @@ import 'package:meta/meta.dart';
 import 'package:optional/optional.dart';
 import 'package:frappe/frappe.dart';
 import '../model.dart';
-import '../petrol_pump.dart';
 
-class Keypad extends BaseObserver {
+class Keypad {
   final ValueState<int> valueState;
 
   final EventStream<Unit> beepStream;

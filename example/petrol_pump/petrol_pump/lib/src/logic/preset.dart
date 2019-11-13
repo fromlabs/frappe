@@ -2,9 +2,8 @@ import 'package:meta/meta.dart';
 import 'package:frappe/frappe.dart';
 import '../logic/fill.dart';
 import '../model.dart';
-import '../petrol_pump.dart';
 
-class Preset extends BaseObserver {
+class Preset {
   final ValueState<Delivery> deliveryState;
 
   final ValueState<bool> isKeypadActiveState;

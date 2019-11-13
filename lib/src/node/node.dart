@@ -46,6 +46,8 @@ abstract class Node<S> extends Referenceable {
     }
   }
 
+  final int id;
+
   final String debugLabel;
 
   final Map<dynamic, HostedReference<Node>> sourceReferences = Map.identity();
@@ -65,7 +67,8 @@ abstract class Node<S> extends Referenceable {
     EvaluationType evaluationType,
     ValueHandler<S> commitHandler,
     ValueHandler<S> publishHandler,
-  })  : debugLabel = '${debugLabel ?? 'node'}:${_nodeId++}',
+  })  : id = _nodeId++,
+        debugLabel = '${debugLabel ?? 'node'}:$_nodeId',
         _evaluationType = evaluationType {
     this.commitHandler = commitHandler ?? (S value) {};
     this.publishHandler = publishHandler ?? (S value) {};

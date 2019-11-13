@@ -122,8 +122,10 @@ class Transaction {
 
   final Map<Node, NodeEvaluation> _evaluations = Map.identity();
 
-  final Set<Node> _pendingNodes = SplayTreeSet<Node>(
-      (node1, node2) => node2.evaluationPriority - node1.evaluationPriority);
+  final Set<Node> _pendingNodes = SplayTreeSet<Node>((node1, node2) {
+    var delta = node2.evaluationPriority - node1.evaluationPriority;
+    return delta != 0 ? delta : node2.id - node1.id;
+  });
 
   TransactionPhase _phase = TransactionPhase.OPENED;
 
@@ -216,6 +218,7 @@ class Transaction {
 
         if (evaluation.isEvaluated) {
           _evaluations[node] = evaluation;
+
           _pendingNodes.remove(node);
 
           _evaluateTargetNodes(node);

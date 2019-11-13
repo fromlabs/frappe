@@ -3,6 +3,7 @@ import 'package:frappe/frappe.dart';
 
 import '../model.dart';
 import '../petrol_pump.dart';
+import '../util.dart';
 
 class PosSimulatorImpl implements PosSimulator {
   Future<void> _stopFuture;

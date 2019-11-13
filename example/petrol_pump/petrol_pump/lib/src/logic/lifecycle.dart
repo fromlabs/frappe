@@ -2,7 +2,6 @@ import 'package:meta/meta.dart';
 import 'package:optional/optional.dart';
 import 'package:frappe/frappe.dart';
 import '../model.dart';
-import '../petrol_pump.dart';
 
 EventStream<Fuel> _whenLifted(
         EventStream<UpDown> nozzleStream, Fuel nozzleFuel) =>
@@ -21,7 +20,7 @@ EventStream<Unit> _whenSetDown(EventStream<UpDown> nozzleStream,
         .asOptional<Unit>()
         .mapWhereOptional();
 
-class Lifecycle extends BaseObserver {
+class Lifecycle {
   final EventStream<Fuel> startStream;
 
   final EventStream<Unit> endStream;

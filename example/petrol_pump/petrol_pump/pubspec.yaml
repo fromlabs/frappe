@@ -5,7 +5,7 @@ description: A starting point for Dart libraries or applications.
 # author: Roberto Tassi <roberto.tassi@fromlabs.org>
 
 environment:
-  sdk: '>=2.4.0 <3.0.0'
+  sdk: '>=2.6.0 <3.0.0'
 
 dependencies:
   pedantic: ^1.0.0
