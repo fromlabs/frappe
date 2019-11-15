@@ -1,3 +1,4 @@
+import 'package:frappe/frappe.dart';
 import 'package:meta/meta.dart';
 
 final Map<Referenceable, Set<Reference>> _globalReferences = Map.identity();
@@ -14,7 +15,7 @@ void assertAllUnreferenced() {
   }
 }
 
-class ReferenceGroup {
+class ReferenceGroup implements Disposable {
   final Set<Reference> _references = Set.identity();
 
   bool _isDisposed = false;
@@ -38,6 +39,7 @@ class ReferenceGroup {
 
   bool get isDisposed => _isDisposed;
 
+  @override
   void dispose() {
     _checkDisposed();
 
@@ -57,7 +59,7 @@ class ReferenceGroup {
   }
 }
 
-class Reference<R extends Referenceable> {
+class Reference<R extends Referenceable> implements Disposable {
   final R value;
 
   bool _isDisposed = false;
@@ -70,6 +72,7 @@ class Reference<R extends Referenceable> {
 
   bool get isDisposed => _isDisposed;
 
+  @override
   void dispose() {
     _checkDisposed();
 

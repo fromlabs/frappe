@@ -20,9 +20,9 @@ void main() {
     PumpEngineSimulator pumpEngineSimulator;
     PosSimulator posSimulator;
 
-    ListenSubscription listenCanceler;
-
     Outputs outputs;
+
+    ListenSubscription listenCanceler;
 
     void connectListeners() {
       listenCanceler = outputs.deliveryState
@@ -86,10 +86,14 @@ void main() {
         posSimulator =
             PosSimulatorImpl(saleCompleteStream: outputs.saleCompleteStream);
         clearSaleStreamRef.connect(posSimulator.clearSaleStream);
+
+        connectListeners();
       });
     });
 
     tearDown(() async {
+      await disconnectListeners();
+
       await Future.wait([
         posSimulator,
         pumpEngineSimulator,
@@ -111,8 +115,6 @@ void main() {
     test('No action', () {});
 
     test('Pump one round', () async {
-      connectListeners();
-
       print('-> nozzle1: ${UpDown.up}');
 
       nozzle1StreamSink.send(UpDown.up);
@@ -124,8 +126,6 @@ void main() {
       nozzle1StreamSink.send(UpDown.down);
 
       await Future.delayed(Duration(seconds: 3));
-
-      await disconnectListeners();
     });
 
     test('Pump two rounds', () async {
@@ -164,8 +164,8 @@ void main() {
   });
 
   group('Switch pump', () {
-    EventStreamLink<int> fuelPulsesStreamRef;
-    EventStreamLink<Unit> clearSaleStreamRef;
+    EventStreamReference<EventStream<int>> fuelPulsesStreamReference;
+    EventStreamReference<EventStream<Unit>> clearSaleStreamReference;
     EventStreamSink<UpDown> nozzle1StreamSink;
     EventStreamSink<UpDown> nozzle2StreamSink;
     EventStreamSink<UpDown> nozzle3StreamSink;
@@ -184,23 +184,26 @@ void main() {
     ListenSubscription listenCanceler;
 
     void connectListeners() {
-      listenCanceler = outputs.deliveryState
-          .listen((e) => print('deliveryState: $e'))
+      listenCanceler = ListenSubscription()
           .append(pumpLogicStateSink.state.listen((e) => print(
-              'pumpLogicState: ${e.map((pump) => pump.runtimeType.toString()).orElse('none')}')))
+              '-> pumpLogic: ${e.map((pump) => pump.runtimeType.toString()).orElse('none')}')))
+          .append(nozzle1StreamSink.stream.listen((e) => print('-> nozzle1: $e')))
+          .append(nozzle2StreamSink.stream.listen((e) => print('-> nozzle2: $e')))
+          .append(nozzle3StreamSink.stream.listen((e) => print('-> nozzle3: $e')))
+          .append(outputs.deliveryState.listen((e) => print('delivery: $e')))
           .append(outputs.saleCostLcdState
-              .listen((e) => print('saleCostLcdState: $e')))
+              .listen((e) => print('saleCostLcd: $e')))
           .append(
-              outputs.presetLcdState.listen((e) => print('presetLcdState: $e')))
+              outputs.presetLcdState.listen((e) => print('presetLcd: $e')))
           .append(outputs.saleQuantityLcdState
-              .listen((e) => print('saleQuantityLcdState: $e')))
+              .listen((e) => print('saleQuantityLcd: $e')))
           .append(
-              outputs.priceLcd1State.listen((e) => print('priceLcd1State: $e')))
+              outputs.priceLcd1State.listen((e) => print('priceLcd1: $e')))
           .append(
-              outputs.priceLcd2State.listen((e) => print('priceLcd2State: $e')))
+              outputs.priceLcd2State.listen((e) => print('priceLcd2: $e')))
           .append(
-              outputs.priceLcd3State.listen((e) => print('priceLcd3State: $e')))
-          .append(outputs.beepStream.listen((e) => print('beepStream')))
+              outputs.priceLcd3State.listen((e) => print('priceLcd3: $e')))
+          .append(outputs.beepStream.listen((e) => print('beep')))
           .append(outputs.saleCompleteStream
               .listen((e) => print('saleCompleteStream: $e')));
     }
@@ -209,54 +212,68 @@ void main() {
       await ListenCancelerDisposable(listenCanceler).dispose();
     }
 
+    setUpAll(() {
+      initTransaction();
+    });
+
     setUp(() {
-      fuelPulsesStreamRef = EventStreamLink<int>();
-      clearSaleStreamRef = EventStreamLink<Unit>();
-      nozzle1StreamSink = EventStreamSink<UpDown>();
-      nozzle2StreamSink = EventStreamSink<UpDown>();
-      nozzle3StreamSink = EventStreamSink<UpDown>();
-      keypadStreamSink = EventStreamSink<NumericKey>();
-      calibrationStateSink = ValueStateSink<double>(0.001);
-      price1StateSink = ValueStateSink<double>(2.149);
-      price2StateSink = ValueStateSink<double>(2.341);
-      price3StateSink = ValueStateSink<double>(1.499);
-      pumpLogicStateSink = OptionalValueStateSink<Pump>.empty();
+      runTransaction(() {
+        final fuelPulsesStreamLink = EventStreamLink<int>();
+        final clearSaleStreamLink = EventStreamLink<Unit>();
+        fuelPulsesStreamReference = fuelPulsesStreamLink.stream.toReference();
+        clearSaleStreamReference = clearSaleStreamLink.stream.toReference();
+        nozzle1StreamSink = EventStreamSink<UpDown>();
+        nozzle2StreamSink = EventStreamSink<UpDown>();
+        nozzle3StreamSink = EventStreamSink<UpDown>();
+        keypadStreamSink = EventStreamSink<NumericKey>();
+        calibrationStateSink = ValueStateSink<double>(0.001);
+        price1StateSink = ValueStateSink<double>(2.149);
+        price2StateSink = ValueStateSink<double>(2.341);
+        price3StateSink = ValueStateSink<double>(1.499);
+        pumpLogicStateSink = OptionalValueStateSink<Pump>.empty();
 
-      final outputsState = pumpLogicStateSink.state.map((pump) {
-        if (pump.isPresent) {
-          return pump.value.create(Inputs.fromDefault(
-            (builder) => builder
-              ..nozzle1Stream = nozzle1StreamSink.stream
-              ..nozzle2Stream = nozzle2StreamSink.stream
-              ..nozzle3Stream = nozzle3StreamSink.stream
-              ..keypadStream = keypadStreamSink.stream
-              ..fuelPulsesStream = fuelPulsesStreamRef.stream
-              ..calibrationState = calibrationStateSink.state
-              ..price1State = price1StateSink.state
-              ..price2State = price2StateSink.state
-              ..price3State = price3StateSink.state
-              ..clearSaleStream = clearSaleStreamRef.stream,
-          ));
-        } else {
-          return Outputs.fromDefault();
-        }
+        final outputsState = pumpLogicStateSink.state.map((pump) {
+          if (pump.isPresent) {
+            return pump.value.create(Inputs.fromDefault(
+              (builder) => builder
+                ..nozzle1Stream = nozzle1StreamSink.stream
+                ..nozzle2Stream = nozzle2StreamSink.stream
+                ..nozzle3Stream = nozzle3StreamSink.stream
+                ..keypadStream = keypadStreamSink.stream
+                ..fuelPulsesStream = fuelPulsesStreamLink.stream
+                ..calibrationState = calibrationStateSink.state
+                ..price1State = price1StateSink.state
+                ..price2State = price2StateSink.state
+                ..price3State = price3StateSink.state
+                ..clearSaleStream = clearSaleStreamLink.stream,
+            ));
+          } else {
+            return Outputs.fromDefault();
+          }
+        });
+
+        outputs = switchOutputs(outputsState);
+
+        pumpEngineSimulator =
+            PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
+        fuelPulsesStreamLink.connect(pumpEngineSimulator.fuelPulsesStream);
+
+        posSimulator =
+            PosSimulatorImpl(saleCompleteStream: outputs.saleCompleteStream);
+        clearSaleStreamLink.connect(posSimulator.clearSaleStream);
+
+        connectListeners();
       });
-
-      outputs = switchOutputs(outputsState);
-
-      pumpEngineSimulator =
-          PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
-      fuelPulsesStreamRef.connect(pumpEngineSimulator.fuelPulsesStream);
-
-      posSimulator =
-          PosSimulatorImpl(saleCompleteStream: outputs.saleCompleteStream);
-      clearSaleStreamRef.connect(posSimulator.clearSaleStream);
     });
 
     tearDown(() async {
+      await disconnectListeners();
+
       await Future.wait([
         posSimulator,
         pumpEngineSimulator,
+        fuelPulsesStreamReference,
+        clearSaleStreamReference,
         EventStreamSinkDisposable(nozzle1StreamSink),
         EventStreamSinkDisposable(nozzle2StreamSink),
         EventStreamSinkDisposable(nozzle3StreamSink),
@@ -273,72 +290,41 @@ void main() {
       assertCleanup();
     });
 
-    test('No pump', () async {
-      connectListeners();
-
-      await disconnectListeners();
+    test('No pump', () async {      
     });
 
     test('LifecyclePump complete', () async {
-      connectListeners();
-
-      pumpLogicStateSink.sendOptionalOf(LifecyclePump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(LifecyclePump()));
 
       nozzle1StreamSink.send(UpDown.up);
 
       await Future.delayed(Duration(seconds: 1));
 
       nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      await disconnectListeners();
     });
 
     test('AccumulatePulsesPump complete', () async {
-      connectListeners();
-
-      pumpLogicStateSink.sendOptionalOf(AccumulatePulsesPump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(AccumulatePulsesPump()));
 
       nozzle1StreamSink.send(UpDown.up);
 
       await Future.delayed(Duration(seconds: 1));
 
       nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      await disconnectListeners();
     });
 
     test('ShowDollarsPump complete', () async {
-      connectListeners();
-
-      pumpLogicStateSink.sendOptionalOf(ShowDollarsPump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(ShowDollarsPump()));
 
       nozzle1StreamSink.send(UpDown.up);
 
       await Future.delayed(Duration(seconds: 1));
 
       nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      await disconnectListeners();
     });
 
     test('Clear sale pump', () async {
-      connectListeners();
-
-      pumpLogicStateSink.sendOptionalOf(ClearSalePump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(ClearSalePump())); 
 
       keypadStreamSink.send(NumericKey.one);
 
@@ -348,17 +334,11 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await Future.delayed(Duration(seconds: 3));
-
-      await disconnectListeners();
+      await clearSaleStreamReference.stream.toLegacyStream().first;
     });
 
     test('Preset pump', () async {
-      connectListeners();
-
-      pumpLogicStateSink.sendOptionalOf(PresetAmountPump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(PresetAmountPump()));
 
       keypadStreamSink.send(NumericKey.one);
 
@@ -368,17 +348,11 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await Future.delayed(Duration(seconds: 3));
-
-      await disconnectListeners();
+      await clearSaleStreamReference.stream.toLegacyStream().first;
     });
 
     test('All pumps switch', () async {
-      connectListeners();
-
-      pumpLogicStateSink.sendOptionalOf(LifecyclePump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(LifecyclePump()));
 
       nozzle1StreamSink.send(UpDown.up);
 
@@ -386,11 +360,7 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await Future.delayed(Duration(seconds: 1));
-
-      pumpLogicStateSink.sendOptionalOf(AccumulatePulsesPump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(AccumulatePulsesPump()));
 
       nozzle1StreamSink.send(UpDown.up);
 
@@ -398,11 +368,7 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await Future.delayed(Duration(seconds: 1));
-
-      pumpLogicStateSink.sendOptionalOf(ShowDollarsPump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(ShowDollarsPump()));
 
       nozzle1StreamSink.send(UpDown.up);
 
@@ -410,11 +376,7 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await Future.delayed(Duration(seconds: 1));
-
-      pumpLogicStateSink.sendOptionalOf(ClearSalePump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(ClearSalePump()));
 
       nozzle1StreamSink.send(UpDown.up);
 
@@ -422,11 +384,9 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await Future.delayed(Duration(seconds: 3));
+      await clearSaleStreamReference.stream.toLegacyStream().first;
 
-      pumpLogicStateSink.sendOptionalOf(PresetAmountPump());
-
-      await Future(() {});
+      runTransaction(() => pumpLogicStateSink.sendOptionalOf(PresetAmountPump()));
 
       nozzle1StreamSink.send(UpDown.up);
 
@@ -434,139 +394,54 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await Future.delayed(Duration(seconds: 3));
-
-      await disconnectListeners();
+      await clearSaleStreamReference.stream.toLegacyStream().first;
     });
 
     test('All pumps switch two times', () async {
-      connectListeners();
+      for (var i = 0; i < 2; i++) {
+        runTransaction(() => pumpLogicStateSink.sendOptionalOf(LifecyclePump()));
+          nozzle1StreamSink.send(UpDown.up);
 
-      pumpLogicStateSink.sendOptionalOf(LifecyclePump());
+          await Future.delayed(Duration(seconds: 1));
 
-      await Future(() {});
+          nozzle1StreamSink.send(UpDown.down);
 
-      nozzle1StreamSink.send(UpDown.up);
+          runTransaction(() => pumpLogicStateSink.sendOptionalOf(AccumulatePulsesPump()));
 
-      await Future.delayed(Duration(seconds: 1));
+          nozzle1StreamSink.send(UpDown.up);
 
-      nozzle1StreamSink.send(UpDown.down);
+          await Future.delayed(Duration(seconds: 1));
 
-      await Future.delayed(Duration(seconds: 1));
+          nozzle1StreamSink.send(UpDown.down);
 
-      pumpLogicStateSink.sendOptionalOf(AccumulatePulsesPump());
+          runTransaction(() => pumpLogicStateSink.sendOptionalOf(ShowDollarsPump()));
 
-      await Future(() {});
+          nozzle1StreamSink.send(UpDown.up);
 
-      nozzle1StreamSink.send(UpDown.up);
+          await Future.delayed(Duration(seconds: 1));
 
-      await Future.delayed(Duration(seconds: 1));
+          nozzle1StreamSink.send(UpDown.down);
 
-      nozzle1StreamSink.send(UpDown.down);
+          runTransaction(() => pumpLogicStateSink.sendOptionalOf(ClearSalePump()));
 
-      await Future.delayed(Duration(seconds: 1));
+          nozzle1StreamSink.send(UpDown.up);
 
-      pumpLogicStateSink.sendOptionalOf(ShowDollarsPump());
+          await Future.delayed(Duration(seconds: 1));
 
-      await Future(() {});
+          nozzle1StreamSink.send(UpDown.down);
 
-      nozzle1StreamSink.send(UpDown.up);
+          await clearSaleStreamReference.stream.toLegacyStream().first;
 
-      await Future.delayed(Duration(seconds: 1));
+          runTransaction(() => pumpLogicStateSink.sendOptionalOf(PresetAmountPump()));
 
-      nozzle1StreamSink.send(UpDown.down);
+          nozzle1StreamSink.send(UpDown.up);
 
-      await Future.delayed(Duration(seconds: 1));
+          await Future.delayed(Duration(seconds: 1));
 
-      pumpLogicStateSink.sendOptionalOf(ClearSalePump());
+          nozzle1StreamSink.send(UpDown.down);
 
-      await Future(() {});
-
-      nozzle1StreamSink.send(UpDown.up);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 3));
-
-      pumpLogicStateSink.sendOptionalOf(PresetAmountPump());
-
-      await Future(() {});
-
-      nozzle1StreamSink.send(UpDown.up);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 3));
-
-      await disconnectListeners();
-
-      connectListeners();
-
-      pumpLogicStateSink.sendOptionalOf(LifecyclePump());
-
-      await Future(() {});
-
-      nozzle1StreamSink.send(UpDown.up);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      pumpLogicStateSink.sendOptionalOf(AccumulatePulsesPump());
-
-      await Future(() {});
-
-      nozzle1StreamSink.send(UpDown.up);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      pumpLogicStateSink.sendOptionalOf(ShowDollarsPump());
-
-      await Future(() {});
-
-      nozzle1StreamSink.send(UpDown.up);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      pumpLogicStateSink.sendOptionalOf(ClearSalePump());
-
-      await Future(() {});
-
-      nozzle1StreamSink.send(UpDown.up);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 3));
-
-      pumpLogicStateSink.sendOptionalOf(PresetAmountPump());
-
-      await Future(() {});
-
-      nozzle1StreamSink.send(UpDown.up);
-
-      await Future.delayed(Duration(seconds: 1));
-
-      nozzle1StreamSink.send(UpDown.down);
-
-      await Future.delayed(Duration(seconds: 3));
-
-      await disconnectListeners();
+          await clearSaleStreamReference.stream.toLegacyStream().first;
+      }
     });
   });
 }

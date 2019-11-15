@@ -23,7 +23,7 @@ Merger<E> _defaultMergerFactory<E>() => (E value1, E value2) => value1;
 NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
     inputs.evaluation;
 
-class EventStreamReference<ES extends EventStream> {
+class EventStreamReference<ES extends EventStream> implements Disposable {
   final ES stream;
 
   final Reference<Node> _reference;
@@ -33,6 +33,7 @@ class EventStreamReference<ES extends EventStream> {
 
   bool get isDisposed => _reference.isDisposed;
 
+  @override
   void dispose() => _reference.dispose();
 }
 
@@ -51,6 +52,8 @@ class EventStreamSink<E> {
         _sinkMerger = sinkMerger ?? _defaultSinkMergerFactory<E>();
 
   bool get isClosed => _nodeReference.isDisposed;
+
+  bool get isNotClosed => !isClosed;
 
   void close() => _nodeReference.dispose();
 
@@ -91,11 +94,13 @@ class EventStreamLink<E> {
 
   EventStreamLink._(this.stream);
 
-  bool get isLinked => _node.isLinked;
+  bool get isConnected => _node.isLinked;
+
+  bool get isNotConnected => !isConnected;
 
   void connect(EventStream<E> stream) => Transaction.runRequired((_) {
-        if (isLinked) {
-          throw StateError("Reference already linked");
+        if (isConnected) {
+          throw StateError("Link already connected");
         }
 
         _node.link(stream._node);
@@ -182,6 +187,10 @@ class EventStream<E> {
 
     return EventStream._(targetNode);
   }
+
+  bool get isReferenced => _node.isReferenced;
+
+  bool get isUnreferenced => !isReferenced;
 
   OptionalEventStream<EE> asOptional<EE>() =>
       Transaction.runRequired((transaction) {

@@ -55,7 +55,7 @@ class LazyValue<V> {
       this as LazyValue<Optional<VV>>;
 }
 
-class ValueStateReference<VS extends ValueState> {
+class ValueStateReference<VS extends ValueState> implements Disposable {
   final VS state;
 
   final Reference<Node> _reference;
@@ -65,6 +65,7 @@ class ValueStateReference<VS extends ValueState> {
 
   bool get isDisposed => _reference.isDisposed;
 
+  @override
   void dispose() => _reference.dispose();
 }
 
@@ -130,14 +131,14 @@ class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
 
 class ValueStateLink<V> {
   final ValueState<V> state;
-  ValueState<V> _linkedState;
+  LazyValue<V> _connectedLazyValue;
 
   factory ValueStateLink() => Transaction.runRequired((transaction) {
         ValueStateLink<V> link;
 
         link = ValueStateLink._(ValueState<V>._(
-            LazyValue<V>.provide(() => link.isLinked
-                ? link._linkedState.current()
+            LazyValue<V>.provide(() => link.isConnected
+                ? link._connectedLazyValue.get()
                 : throw StateError('Link is not connected')),
             createEventStream<V>(
                 KeyNode<V>(evaluateHandler: _defaultEvaluateHandler))));
@@ -147,14 +148,16 @@ class ValueStateLink<V> {
 
   ValueStateLink._(this.state);
 
-  bool get isLinked => _linkedState != null;
+  bool get isConnected => _node.isLinked;
+
+  bool get isNotConnected => !isConnected;
 
   void connect(ValueState<V> state) => Transaction.runRequired((_) {
-        if (isLinked) {
-          throw StateError("Reference already linked");
+        if (isConnected) {
+          throw StateError("Link already connected");
         }
 
-        _linkedState = state;
+        _connectedLazyValue = state.currentLazy();
         _node.link(state._node);
       });
 
@@ -167,8 +170,8 @@ class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
 
     link = Transaction.runRequired((transaction) => OptionalValueStateLink._(
         OptionalValueState<V>._(
-            LazyValue<Optional<V>>.provide(() => link.isLinked
-                ? link._linkedState.current()
+            LazyValue<Optional<V>>.provide(() => link.isConnected
+                ? link._connectedLazyValue.get()
                 : throw StateError('Link is not connected')),
             createOptionalEventStream(KeyNode<Optional<V>>(
                 evaluateHandler: _defaultEvaluateHandler)))));
@@ -276,6 +279,10 @@ class ValueState<V> {
 
         return createEventStream(targetNode);
       });
+
+  bool get isReferenced => _node.isReferenced;
+
+  bool get isUnreferenced => !isReferenced;
 
   V current() => Transaction.run((transaction) => currentLazy().get());
 

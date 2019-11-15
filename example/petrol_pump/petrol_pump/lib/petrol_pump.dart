@@ -19,3 +19,4 @@ export 'src/simulator/pump_engine_simulator_impl.dart';
 export 'src/model.dart';
 export 'src/petrol_pump.dart';
 export 'src/bloc/petrol_pump_bloc.dart';
+export 'src/util.dart';

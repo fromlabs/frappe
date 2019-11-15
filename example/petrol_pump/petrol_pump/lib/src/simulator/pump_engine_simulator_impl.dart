@@ -64,7 +64,7 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
 
       subscription = tickerTimer.timerStream
           .gate(disposePendingState.map((pending) => !pending))
-          .listen((_) {
+          .listen((_) async {
         int pulses;
         switch (_deliveryState.current()) {
           case Delivery.fast1:
@@ -83,6 +83,8 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
         }
 
         if (pulses > 0) {
+          await Future(() {});
+
           _fuelPulsesStreamSink.send(pulses);
         }
       });

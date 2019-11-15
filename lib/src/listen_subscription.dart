@@ -1,5 +1,7 @@
-abstract class ListenSubscription {
-  void cancel();
+class ListenSubscription {
+  ListenSubscription();
+
+  void cancel() {}
 
   ListenSubscription append(ListenSubscription listener) =>
       _AppendListenSubscription(this, listener);

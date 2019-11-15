@@ -8,6 +8,7 @@ export 'src/unit.dart';
 export 'src/transaction.dart';
 export 'src/event_stream.dart'
     show
+        EventStreamReference,
         EventStream,
         OptionalEventStream,
         EventStreamLink,
@@ -16,6 +17,7 @@ export 'src/event_stream.dart'
         OptionalEventStreamSink;
 export 'src/value_state.dart'
     show
+        ValueStateReference,
         ValueState,
         OptionalValueState,
         ValueStateSink,
