@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_petrol_pump/page/petrol_pump.dart';
+import 'package:frappe/frappe.dart';
 import 'package:petrol_pump/petrol_pump.dart';
 import 'package:provider/provider.dart';
 
-void main() => runApp(PetrolPumpApp());
+void main() {
+  initTransaction();
+
+  runApp(PetrolPumpApp());
+}
 
 class PetrolPumpApp extends StatelessWidget {
   @override

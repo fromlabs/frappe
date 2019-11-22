@@ -59,7 +59,8 @@ class _ValueStateBuilderState<S> extends State<ValueStateBuilder<S>> {
       widget._build(context, widget._state.current());
 
   void _subscribe() {
-    _listenCanceler = widget._state.listen((state) => setState(() {}));
+    _listenCanceler = runTransaction(
+        () => widget._state.toUpdates().listen((state) => setState(() {})));
   }
 
   void _unsubscribe() {

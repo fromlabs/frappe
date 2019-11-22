@@ -7,26 +7,6 @@ import '../model.dart';
 import '../petrol_pump.dart';
 import '../util.dart';
 
-class PeriodicTimer {
-  final Duration period;
-
-  final EventStreamSink<Unit> _timerStreamSink = EventStreamSink();
-
-  StreamSubscription _timerSubscription;
-
-  PeriodicTimer(this.period) {
-    _timerSubscription =
-        Stream.periodic(period).listen((_) => _timerStreamSink.send(unit));
-  }
-
-  EventStream<Unit> get timerStream => _timerStreamSink.stream;
-
-  Future<void> dispose() async {
-    await _timerSubscription.cancel();
-    await _timerStreamSink.close();
-  }
-}
-
 class PumpEngineSimulatorImpl implements PumpEngineSimulator {
   Future<void> _stopFuture;
 
@@ -62,7 +42,7 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
       final disposePendingState =
           _disposeStreamSink.stream.mapTo(true).toState(false);
 
-      subscription = tickerTimer.timerStream
+      subscription = tickerTimer.stream
           .gate(disposePendingState.map((pending) => !pending))
           .listen((_) async {
         int pulses;
@@ -89,7 +69,7 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
         }
       });
 
-      await _disposeStreamSink.stream.toLegacyStream().first;
+      await _disposeStreamSink.stream.first();
     } finally {
       await subscription.cancel();
       await tickerTimer.dispose();
