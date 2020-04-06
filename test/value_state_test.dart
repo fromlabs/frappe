@@ -1,21 +1,16 @@
 import 'dart:collection';
 
 import 'package:frappe/frappe.dart';
-import 'package:frappe/src/transaction.dart';
 import 'package:optional/optional_internal.dart';
 import 'package:test/test.dart';
 
 void main() {
-  setUpAll(() {
-    initTransaction();
-  });
-
   setUp(() {
-    cleanUp();
+    FrappeObject.cleanState();
   });
 
   tearDown(() {
-    assertCleanup();
+    FrappeObject.assertCleanState();
   });
 
   group('ValueState 01', () {

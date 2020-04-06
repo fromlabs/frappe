@@ -12,9 +12,9 @@ class NodeReferenceable extends Referenceable {
 
 void main() {
   test('Reference test 01', () {
-    final n1 = NodeReferenceable("node1");
-    final n2 = NodeReferenceable("node2");
-    final n3 = NodeReferenceable("node3");
+    final n1 = NodeReferenceable('node1');
+    final n2 = NodeReferenceable('node2');
+    final n3 = NodeReferenceable('node3');
 
     final nRef1 = Reference(n1);
     final nRef2 = Reference(n2);
@@ -43,9 +43,9 @@ void main() {
   });
 
   test('Reference test 02', () {
-    final n1 = NodeReferenceable("node1");
-    final n2 = NodeReferenceable("node2");
-    final n3 = NodeReferenceable("node3");
+    final n1 = NodeReferenceable('node1');
+    final n2 = NodeReferenceable('node2');
+    final n3 = NodeReferenceable('node3');
 
     final nRef1 = Reference(n1);
     final nRef2 = Reference(n2);
@@ -75,7 +75,7 @@ void main() {
   });
 
   test('Reference test 03', () {
-    final n1 = NodeReferenceable("node1");
+    final n1 = NodeReferenceable('node1');
 
     final nRef1 = Reference(n1);
 
@@ -89,8 +89,8 @@ void main() {
   });
 
   test('Reference test 04', () {
-    final n1 = NodeReferenceable("node1");
-    final n2 = NodeReferenceable("node2");
+    final n1 = NodeReferenceable('node1');
+    final n2 = NodeReferenceable('node2');
 
     expect(() => n1.reference(n2), throwsArgumentError);
 
@@ -105,7 +105,7 @@ void main() {
   });
 
   test('Reference test 05', () {
-    final n1 = NodeReferenceable("node1");
+    final n1 = NodeReferenceable('node1');
 
     final nRef1 = Reference(n1);
 
@@ -117,8 +117,8 @@ void main() {
   });
 
   test('Reference test 06', () {
-    final n1 = NodeReferenceable("node1");
-    final n2 = NodeReferenceable("node2");
+    final n1 = NodeReferenceable('node1');
+    final n2 = NodeReferenceable('node2');
 
     final nRef1 = Reference(n1);
     final nRef2 = Reference(n2);
@@ -140,8 +140,8 @@ void main() {
   });
 
   test('Reference test 07', () {
-    final n1 = NodeReferenceable("node1");
-    final n2 = NodeReferenceable("node2");
+    final n1 = NodeReferenceable('node1');
+    final n2 = NodeReferenceable('node2');
 
     final nRef1 = Reference(n1);
     final nRef2 = Reference(n2);
@@ -163,8 +163,8 @@ void main() {
   });
 
   test('Reference test 08', () {
-    final n1 = NodeReferenceable("node1");
-    final n2 = NodeReferenceable("node2");
+    final n1 = NodeReferenceable('node1');
+    final n2 = NodeReferenceable('node2');
 
     Reference(n1);
     final nRef2 = Reference(n2);

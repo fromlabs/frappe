@@ -274,8 +274,8 @@ class Pump_SettingStatesDialog extends State<PumpSettingsDialog> {
 
     final petrolPumpBloc = Provider.of<PetrolPumpBloc>(context, listen: false);
 
-    _priceControllers = BuiltList.of(petrolPumpBloc.priceSettingStates
-        .map((state) => TextEditingController(text: state.current.toString())));
+    _priceControllers = BuiltList.of(petrolPumpBloc.priceSettingStates.map(
+        (state) => TextEditingController(text: state.getValue.toString())));
   }
 
   @override

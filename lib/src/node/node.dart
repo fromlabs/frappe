@@ -1,18 +1,12 @@
-import 'package:frappe/src/node.dart';
-
 import '../reference.dart';
 
 import 'node_evaluation_collection.dart';
 import 'node_evaluation_list.dart';
 import 'node_evaluation_map.dart';
 import 'node_evaluation.dart';
+import 'transaction.dart';
 
-typedef NodeHandler<V> = void Function(Node<V> node);
-typedef NodeValueUpdatedHandler<V> = void Function(
-    Node node, V newValue, V oldValue);
 typedef ValueHandler<V> = void Function(V value);
-typedef OverrideValueHandler<V> = void Function(
-    ValueHandler<V> superCommit, V value);
 typedef NodeEvaluator<V> = NodeEvaluation<V> Function(
     Map<dynamic, NodeEvaluation> inputs);
 typedef KeyNodeEvaluator<V> = NodeEvaluation<V> Function(
@@ -27,20 +21,15 @@ abstract class Node<S> extends Referenceable {
   static final Set<Node> _globalTargetNodes = Set.identity();
   static final Set<Node> _globalSourceNodes = Set.identity();
 
-  static NodeHandler onNodeAddedHandler = (_) {};
-  static NodeHandler onNodeRemovedHandler = (_) {};
-  static NodeValueUpdatedHandler<EvaluationType>
-      onEvaluationTypeUpdatedHandler = (_, __, ___) {};
-
-  static void cleanAllNodesUnlinked() {
+  static void cleanState() {
     _globalSourceNodes.clear();
     _globalTargetNodes.clear();
   }
 
-  static void assertAllNodesUnlinked() {
+  static void assertCleanState() {
     if (_globalSourceNodes.isNotEmpty || _globalTargetNodes.isNotEmpty) {
-      print('Source nodes: ${_globalSourceNodes}');
-      print('Target nodes: ${_globalTargetNodes}');
+      print('Source nodes: $_globalSourceNodes');
+      print('Target nodes: $_globalTargetNodes');
 
       throw AssertionError('Not all nodes unlinked');
     }
@@ -74,7 +63,7 @@ abstract class Node<S> extends Referenceable {
     this.publishHandler = publishHandler ?? (S value) {};
     _evaluationPriority = 1;
 
-    onNodeAddedHandler(this);
+    Transaction.onNodeAdded(this);
   }
 
   EvaluationType get evaluationType => _evaluationType;
@@ -85,7 +74,8 @@ abstract class Node<S> extends Referenceable {
 
       _evaluationType = evaluationType;
 
-      onEvaluationTypeUpdatedHandler(this, evaluationType, oldEvaluationType);
+      Transaction.onEvaluationTypeUpdated(
+          this, evaluationType, oldEvaluationType);
     }
   }
 
@@ -98,7 +88,7 @@ abstract class Node<S> extends Referenceable {
 
   @override
   void onUnreferenced() {
-    onNodeRemovedHandler(this);
+    Transaction.onNodeRemoved(this);
 
     super.onUnreferenced();
   }
@@ -221,9 +211,11 @@ class IndexNode<S> extends Node<S> {
 
   @override
   void onUnreferenced() {
-    unlink();
+    Transaction.onUnreferencedInterceptor(this, () {
+      unlink();
 
-    super.onUnreferenced();
+      super.onUnreferenced();
+    });
   }
 
   @override
@@ -270,11 +262,13 @@ class KeyNode<S> extends Node<S> {
 
   @override
   void onUnreferenced() {
-    while (isLinked) {
-      unlink(key: sourceReferences.keys.last);
-    }
+    Transaction.onUnreferencedInterceptor(this, () {
+      while (isLinked) {
+        unlink(key: sourceReferences.keys.last);
+      }
 
-    super.onUnreferenced();
+      super.onUnreferenced();
+    });
   }
 
   @override

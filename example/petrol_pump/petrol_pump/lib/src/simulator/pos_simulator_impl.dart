@@ -41,7 +41,7 @@ class PosSimulatorImpl implements PosSimulator {
         _clearSaleStreamSink.send(unit);
       });
 
-      final ValueState<bool> salePendingState = _saleCompleteStream
+      final salePendingState = _saleCompleteStream
           .mapTo(true)
           .orElse(_clearSaleStreamSink.stream.mapTo(false))
           .toState(false);

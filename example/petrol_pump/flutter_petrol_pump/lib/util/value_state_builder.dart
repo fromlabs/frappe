@@ -56,7 +56,7 @@ class _ValueStateBuilderState<S> extends State<ValueStateBuilder<S>> {
 
   @override
   Widget build(BuildContext context) =>
-      widget._build(context, widget._state.current());
+      widget._build(context, widget._state.getValue());
 
   void _subscribe() {
     _listenCanceler = runTransaction(
@@ -120,10 +120,11 @@ class _OptionalValueStateBuilderState<S>
 
   @override
   Widget build(BuildContext context) =>
-      widget._build(context, widget._state.current());
+      widget._build(context, widget._state.getValue());
 
   void _subscribe() {
-    _listenCanceler = widget._state.listen((state) => setState(() {}));
+    _listenCanceler = runTransaction(
+        () => widget._state.toUpdates().listen((state) => setState(() {})));
   }
 
   void _unsubscribe() {

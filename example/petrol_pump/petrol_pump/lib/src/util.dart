@@ -2,14 +2,8 @@ import 'dart:async';
 
 import 'package:frappe/frappe.dart';
 
-extension EventStreamReferenceIterable<ER extends EventStreamReference>
-    on Iterable<ER> {
-  void dispose() => this.forEach((reference) => reference.dispose());
-}
-
-extension ValueStateReferenceIterable<VR extends ValueStateReference>
-    on Iterable<VR> {
-  void dispose() => this.forEach((reference) => reference.dispose());
+extension FrappeReferenceIterable<FR extends FrappeReference> on Iterable<FR> {
+  void dispose() => forEach((reference) => reference.dispose());
 }
 
 extension ExtendedEventStream<E> on EventStream<E> {

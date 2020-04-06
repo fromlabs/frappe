@@ -2,7 +2,7 @@ import 'package:frappe/frappe.dart';
 
 import 'model.dart';
 
-typedef Outputs createPump(Inputs inputs);
+typedef createPump = Outputs Function(Inputs inputs);
 
 abstract class Pump {
   Outputs create(Inputs inputs);

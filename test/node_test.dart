@@ -1,22 +1,20 @@
 import 'dart:collection';
 
-import 'package:frappe/frappe.dart';
 import 'package:frappe/src/node.dart';
 import 'package:frappe/src/reference.dart';
-import 'package:frappe/src/node/node_evaluation.dart';
 import 'package:test/test.dart';
 
 void main() {
-  setUpAll(() {
-    Transaction.init();
-  });
-
   setUp(() {
-    cleanUp();
+    Transaction.cleanState();
+    Node.cleanState();
+    Reference.cleanState();
   });
 
   tearDown(() {
-    assertCleanup();
+    Transaction.assertCleanState();
+    Node.assertCleanState();
+    Reference.assertCleanState();
   });
 
   test('Node test 1', () {
@@ -87,7 +85,7 @@ void main() {
   });
 
   test('Node test 4b', () {
-    KeyNode<int> node1 = Transaction.run((_) => KeyNode<int>(debugLabel: 'N1'));
+    final node1 = Transaction.run((_) => KeyNode<int>(debugLabel: 'N1'));
 
     KeyNode<int> node2;
 
@@ -101,7 +99,7 @@ void main() {
   test('Node test 4c', () {
     KeyNode<int> node1;
 
-    KeyNode<int> node2 = Transaction.run((_) => KeyNode<int>(debugLabel: 'N2'));
+    final node2 = Transaction.run((_) => KeyNode<int>(debugLabel: 'N2'));
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -217,16 +215,64 @@ void main() {
 
       node2bRef.dispose();
 
-      tx.reference(node2);
-
-      expect(node1.isReferenced, false);
+      expect(node1.isReferenced, true);
       expect(node2.isReferenced, true);
-
-      expect(() => node2.link(node1), throwsArgumentError);
     });
 
     expect(node1.isReferenced, false);
     expect(node2.isReferenced, false);
+  });
+
+  test('Node test 9', () {
+    KeyNode<int> node1;
+    KeyNode<int> node2;
+    KeyNode<int> node3;
+    Reference<KeyNode<int>> node3Ref;
+
+    Transaction.run((tx) {
+      node1 = KeyNode<int>(debugLabel: 'N1');
+      node2 = KeyNode<int>(debugLabel: 'N2');
+      node3 = KeyNode<int>(debugLabel: 'N3');
+
+      node2.link(node1);
+      node3.link(node2);
+
+      node3Ref = Reference(node3);
+    });
+
+    Transaction.run((tx) {
+      final oldRef = node3Ref;
+
+      node3Ref = Reference(node3);
+
+      oldRef.dispose();
+    });
+
+    Transaction.run((tx) {
+      final oldRef = node3Ref;
+
+      oldRef.dispose();
+
+      node3Ref = Reference(node3);
+    });
+
+    Transaction.run((tx) {
+      final oldRef = node3Ref;
+
+      oldRef.dispose();
+
+      node3Ref = Reference(node3);
+    });
+
+    expect(node1.isReferenced, true);
+    expect(node2.isReferenced, true);
+    expect(node3.isReferenced, true);
+
+    node3Ref.dispose();
+
+    expect(node1.isReferenced, false);
+    expect(node2.isReferenced, false);
+    expect(node3.isReferenced, false);
   });
 
   test('Node evaluation test 1', () {
@@ -297,7 +343,7 @@ void main() {
         ..link(merge2);
 
       // ignore: unused_local_variable
-      int merge1Value = 1;
+      var merge1Value = 1;
       final merge1 = KeyNode<int>(
         debugLabel: 'MERGE1',
         evaluationType: EvaluationType.almostOneInput,

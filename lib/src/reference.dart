@@ -1,20 +1,6 @@
 import 'package:frappe/frappe.dart';
 import 'package:meta/meta.dart';
 
-final Map<Referenceable, Set<Reference>> _globalReferences = Map.identity();
-
-void cleanAllUnreferenced() {
-  _globalReferences.clear();
-}
-
-void assertAllUnreferenced() {
-  if (_globalReferences.isNotEmpty) {
-    print('References: ${_globalReferences}');
-
-    throw AssertionError('Not all values unreferenced');
-  }
-}
-
 class ReferenceGroup implements Disposable {
   final Set<Reference> _references = Set.identity();
 
@@ -60,6 +46,21 @@ class ReferenceGroup implements Disposable {
 }
 
 class Reference<R extends Referenceable> implements Disposable {
+  static final Map<Referenceable, Set<Reference>> _globalReferences =
+      Map.identity();
+
+  static void cleanState() {
+    _globalReferences.clear();
+  }
+
+  static void assertCleanState() {
+    if (_globalReferences.isNotEmpty) {
+      print('References: $_globalReferences');
+
+      throw AssertionError('Not all values unreferenced');
+    }
+  }
+
   final R value;
 
   bool _isDisposed = false;
@@ -166,7 +167,7 @@ abstract class Referenceable {
   }
 
   bool _checkReferenced(Referenceable referenceable, [Set<Reference> visited]) {
-    final references = _globalReferences[referenceable];
+    final references = Reference._globalReferences[referenceable];
     if (references != null && references.isNotEmpty) {
       for (final reference in references) {
         if (reference is HostedReference) {

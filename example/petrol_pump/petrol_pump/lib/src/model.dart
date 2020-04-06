@@ -22,21 +22,22 @@ enum NumericKey {
 }
 
 abstract class Inputs implements Built<Inputs, InputsBuilder> {
-  factory Inputs([updates(InputsBuilder b)]) = _$Inputs;
+  factory Inputs([Function(InputsBuilder b) updates]) = _$Inputs;
 
-  factory Inputs.fromDefault([updates(InputsBuilder b)]) => (InputsBuilder()
-        ..nozzle1Stream = EventStream.never()
-        ..nozzle2Stream = EventStream.never()
-        ..nozzle3Stream = EventStream.never()
-        ..keypadStream = EventStream.never()
-        ..fuelPulsesStream = EventStream.never()
-        ..calibrationState = ValueState.constant(0)
-        ..price1State = ValueState.constant(0)
-        ..price2State = ValueState.constant(0)
-        ..price3State = ValueState.constant(0)
-        ..clearSaleStream = EventStream.never()
-        ..update(updates))
-      .build();
+  factory Inputs.fromDefault([Function(InputsBuilder b) updates]) =>
+      (InputsBuilder()
+            ..nozzle1Stream = EventStream.never()
+            ..nozzle2Stream = EventStream.never()
+            ..nozzle3Stream = EventStream.never()
+            ..keypadStream = EventStream.never()
+            ..fuelPulsesStream = EventStream.never()
+            ..calibrationState = ValueState.constant(0)
+            ..price1State = ValueState.constant(0)
+            ..price2State = ValueState.constant(0)
+            ..price3State = ValueState.constant(0)
+            ..clearSaleStream = EventStream.never()
+            ..update(updates))
+          .build();
 
   Inputs._();
 
@@ -53,20 +54,21 @@ abstract class Inputs implements Built<Inputs, InputsBuilder> {
 }
 
 abstract class Outputs implements Built<Outputs, OutputsBuilder> {
-  factory Outputs([updates(OutputsBuilder b)]) = _$Outputs;
+  factory Outputs([Function(OutputsBuilder b) updates]) = _$Outputs;
 
-  factory Outputs.fromDefault([updates(OutputsBuilder b)]) => (OutputsBuilder()
-        ..deliveryState = ValueState.constant(Delivery.off)
-        ..presetLcdState = ValueState.constant('')
-        ..saleCostLcdState = ValueState.constant('')
-        ..saleQuantityLcdState = ValueState.constant('')
-        ..priceLcd1State = ValueState.constant('')
-        ..priceLcd2State = ValueState.constant('')
-        ..priceLcd3State = ValueState.constant('')
-        ..beepStream = EventStream.never()
-        ..saleCompleteStream = EventStream.never()
-        ..update(updates))
-      .build();
+  factory Outputs.fromDefault([Function(OutputsBuilder b) updates]) =>
+      (OutputsBuilder()
+            ..deliveryState = ValueState.constant(Delivery.off)
+            ..presetLcdState = ValueState.constant('')
+            ..saleCostLcdState = ValueState.constant('')
+            ..saleQuantityLcdState = ValueState.constant('')
+            ..priceLcd1State = ValueState.constant('')
+            ..priceLcd2State = ValueState.constant('')
+            ..priceLcd3State = ValueState.constant('')
+            ..beepStream = EventStream.never()
+            ..saleCompleteStream = EventStream.never()
+            ..update(updates))
+          .build();
 
   Outputs._();
 
@@ -82,7 +84,7 @@ abstract class Outputs implements Built<Outputs, OutputsBuilder> {
 }
 
 abstract class Sale implements Built<Sale, SaleBuilder> {
-  factory Sale([updates(SaleBuilder b)]) = _$Sale;
+  factory Sale([Function(SaleBuilder b) updates]) = _$Sale;
 
   Sale._();
 

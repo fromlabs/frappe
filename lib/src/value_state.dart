@@ -1,6 +1,7 @@
-import 'package:frappe/frappe.dart';
 import 'package:optional/optional.dart';
 
+import 'frappe_object.dart';
+import 'frappe_reference.dart';
 import 'reference.dart';
 import 'node.dart';
 import 'transaction.dart';
@@ -8,15 +9,16 @@ import 'event_stream.dart';
 import 'listen_subscription.dart';
 import 'typedef.dart';
 
-Node<V> getValueStateNode<V>(ValueState<V> state) =>
-    getEventStreamNode(state._stream);
-
 ValueState<V> createValueState<V>(
         LazyValue<V> lazyInitValue, EventStream<V> stream) =>
     ValueState._(lazyInitValue, stream);
 
 NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
     inputs.evaluation;
+
+extension ExtendedValueState<V> on ValueState<V> {
+  Node<V> get node => _node;
+}
 
 class LazyValue<V> {
   final ValueProvider<V> _provider;
@@ -53,20 +55,6 @@ class LazyValue<V> {
 
   LazyValue<Optional<VV>> _castOptional<VV>() =>
       this as LazyValue<Optional<VV>>;
-}
-
-class ValueStateReference<VS extends ValueState> implements Disposable {
-  final VS state;
-
-  final Reference<Node> _reference;
-
-  ValueStateReference(this.state)
-      : _reference = Reference(getValueStateNode(state));
-
-  bool get isDisposed => _reference.isDisposed;
-
-  @override
-  void dispose() => _reference.dispose();
 }
 
 class ValueStateSink<V> {
@@ -154,10 +142,10 @@ class ValueStateLink<V> {
 
   void connect(ValueState<V> state) => Transaction.runRequired((_) {
         if (isConnected) {
-          throw StateError("Link already connected");
+          throw StateError('Link already connected');
         }
 
-        _connectedLazyValue = state.currentLazy();
+        _connectedLazyValue = state.getLazyValue();
         _node.link(state._node);
       });
 
@@ -188,7 +176,7 @@ class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
   void connect(covariant OptionalValueState<V> state) => super.connect(state);
 }
 
-class ValueState<V> {
+class ValueState<V> extends FrappeObject<V> {
   LazyValue<V> _currentLazyValue;
 
   Reference _currentValueReference;
@@ -227,15 +215,14 @@ class ValueState<V> {
                       .entries
                       .map((entry) => entry.value.isEvaluated
                           ? entry.value.value
-                          : entry.key.current())),
+                          : entry.key.getValue())),
                 ));
 
-        targetNode
-            .link(states.map((state) => getEventStreamNode(state._stream)));
+        targetNode.link(states.map((state) => state._stream.node));
 
         return ValueState._(
             LazyValue.combines(
-                states.map((state) => state.currentLazy()), combiner),
+                states.map((state) => state.getLazyValue()), combiner),
             createEventStream(targetNode));
       });
 
@@ -246,17 +233,17 @@ class ValueState<V> {
         targetNode = KeyNode<V>(evaluateHandler: _defaultEvaluateHandler);
 
         Transaction.addClosingTransactionHandler(targetNode, (transaction) {
-          if (transaction.hasValue(getValueStateNode(statesState))) {
+          if (transaction.hasValue(statesState._node)) {
             targetNode.unlink();
-            targetNode.link(getValueStateNode(statesState.current()));
+            targetNode.link(statesState.getValue()._node);
           }
         });
 
-        targetNode.link(getValueStateNode(statesState.current()));
-        targetNode.reference(getValueStateNode(statesState));
+        targetNode.link(statesState.getValue()._node);
+        targetNode.reference(statesState._node);
 
         return ValueState._(
-            LazyValue.provide(() => statesState.current().current()),
+            LazyValue.provide(() => statesState.getValue().getValue()),
             createEventStream(targetNode));
       });
 
@@ -268,14 +255,14 @@ class ValueState<V> {
         targetNode = KeyNode<E>(evaluateHandler: _defaultEvaluateHandler);
 
         Transaction.addClosingTransactionHandler(targetNode, (transaction) {
-          if (transaction.hasValue(getValueStateNode(streamsState))) {
+          if (transaction.hasValue(streamsState._node)) {
             targetNode.unlink();
-            targetNode.link(getEventStreamNode(streamsState.current()));
+            targetNode.link(streamsState.getValue().node);
           }
         });
 
-        targetNode.link(getEventStreamNode(streamsState.current()));
-        targetNode.reference(getValueStateNode(streamsState));
+        targetNode.link(streamsState.getValue().node);
+        targetNode.reference(streamsState._node);
 
         return createEventStream(targetNode);
       });
@@ -284,22 +271,23 @@ class ValueState<V> {
 
   bool get isUnreferenced => !isReferenced;
 
-  V current() => Transaction.run((transaction) => currentLazy().get());
+  V getValue() => Transaction.run((transaction) => getLazyValue().get());
 
-  LazyValue<V> currentLazy() => _currentLazyValue;
+  LazyValue<V> getLazyValue() => _currentLazyValue;
 
   OptionalValueState<VV> asOptional<VV>() =>
       Transaction.runRequired((_) => OptionalValueState._(
-          currentLazy()._castOptional<VV>(), _stream.asOptional()));
+          getLazyValue()._castOptional<VV>(), _stream.asOptional()));
 
-  ValueStateReference<ValueState<V>> toReference() => ValueStateReference(this);
+  @override
+  FrappeReference<ValueState<V>> toReference() => FrappeReference(this);
 
   EventStream<V> toValues() => Transaction.runRequired((transaction) {
         final targetNode = KeyNode<V>(
             evaluationType: EvaluationType.always,
             evaluateHandler: (inputs) => inputs.evaluation.isEvaluated
                 ? inputs.evaluation
-                : NodeEvaluation(current()));
+                : NodeEvaluation(getValue()));
 
         Transaction.addClosingTransactionHandler(targetNode, (transaction) {
           targetNode.evaluationType = EvaluationType.allInputs;
@@ -390,13 +378,13 @@ class ValueState<V> {
   EventStream<ER> switchMapStream<ER>(Mapper<V, EventStream<ER>> mapper) =>
       ValueState.switchStream<ER>(map<EventStream<ER>>(mapper));
 
-  Node<V> get _node => getEventStreamNode(_stream);
+  Node<V> get _node => _stream.node;
 
   void _updateCurrentValueReference(V value) {
     _currentValueReference?.dispose();
 
     if (value is EventStream) {
-      _currentValueReference = _node.reference(getEventStreamNode(value));
+      _currentValueReference = _node.reference(value.node);
     } else if (value is ValueState) {
       _currentValueReference = _node.reference(value._node);
     } else if (value is Referenceable) {
@@ -425,16 +413,7 @@ class OptionalValueState<V> extends ValueState<Optional<V>> {
       throw StateError('Already optional');
 
   @override
-  OptionalEventStream<V> toValues() =>
-      Transaction.runRequired((_) => super.toValues().asOptional<V>());
-
-  @override
-  OptionalEventStream<V> toUpdates() =>
-      Transaction.runRequired((_) => super.toUpdates().asOptional<V>());
-
-  @override
-  ValueStateReference<OptionalValueState<V>> toReference() =>
-      ValueStateReference(this);
+  FrappeReference<OptionalValueState<V>> toReference() => FrappeReference(this);
 
   ValueState<bool> mapIsEmptyOptional() => map((value) => !value.isPresent);
 

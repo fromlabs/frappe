@@ -45,15 +45,13 @@ void main() {
               .listen((e) => print('saleCompleteStream: $e')));
     }
 
-    Future<void> disconnectListeners() async {
-      await ListenCancelerDisposable(listenCanceler).dispose();
+    void disconnectListeners() async {
+      listenCanceler.cancel();
     }
 
-    setUpAll(() {
-      initTransaction();
-    });
-
     setUp(() {
+      FrappeObject.assertCleanState();
+
       runTransaction(() {
         fuelPulsesStreamRef = EventStreamLink<int>();
         clearSaleStreamRef = EventStreamLink<Unit>();
@@ -93,7 +91,7 @@ void main() {
     });
 
     tearDown(() async {
-      await disconnectListeners();
+      disconnectListeners();
 
       await Future.wait([
         posSimulator,
@@ -110,7 +108,7 @@ void main() {
           .map<Future>((disposable) => disposable?.dispose())
           .where((future) => future != null));
 
-      assertCleanup();
+      FrappeObject.assertCleanState();
     });
 
     test('No action', () {});
@@ -130,8 +128,6 @@ void main() {
     });
 
     test('Pump two rounds', () async {
-      connectListeners();
-
       print('nozzle1: ${UpDown.up}');
 
       nozzle1StreamSink.send(UpDown.up);
@@ -144,9 +140,11 @@ void main() {
 
       await Future.delayed(Duration(seconds: 3));
 
-      await disconnectListeners();
+      runTransaction(() {
+        disconnectListeners();
 
-      connectListeners();
+        connectListeners();
+      });
 
       print('nozzle1: ${UpDown.up}');
 
@@ -159,14 +157,12 @@ void main() {
       nozzle1StreamSink.send(UpDown.down);
 
       await Future.delayed(Duration(seconds: 3));
-
-      await disconnectListeners();
     });
   });
 
   group('Switch pump', () {
-    EventStreamReference<EventStream<int>> fuelPulsesStreamReference;
-    EventStreamReference<EventStream<Unit>> clearSaleStreamReference;
+    FrappeReference<EventStream<int>> fuelPulsesStreamReference;
+    FrappeReference<EventStream<Unit>> clearSaleStreamReference;
     EventStreamSink<UpDown> nozzle1StreamSink;
     EventStreamSink<UpDown> nozzle2StreamSink;
     EventStreamSink<UpDown> nozzle3StreamSink;
@@ -215,11 +211,9 @@ void main() {
       await ListenCancelerDisposable(listenCanceler).dispose();
     }
 
-    setUpAll(() {
-      initTransaction();
-    });
-
     setUp(() {
+      FrappeObject.assertCleanState();
+
       runTransaction(() {
         final fuelPulsesStreamLink = EventStreamLink<int>();
         final clearSaleStreamLink = EventStreamLink<Unit>();
@@ -290,7 +284,7 @@ void main() {
           .map<Future>((disposable) => disposable?.dispose())
           .where((future) => future != null));
 
-      assertCleanup();
+      FrappeObject.assertCleanState();
     });
 
     test('No pump', () async {});
@@ -338,7 +332,7 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await clearSaleStreamReference.stream.first;
+      await clearSaleStreamReference.object.first;
     });
 
     test('Preset pump', () async {
@@ -353,7 +347,7 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await clearSaleStreamReference.stream.first;
+      await clearSaleStreamReference.object.first;
     });
 
     test('All pumps switch', () async {
@@ -391,7 +385,7 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await clearSaleStreamReference.stream.first;
+      await clearSaleStreamReference.object.first;
 
       runTransaction(
           () => pumpLogicStateSink.sendOptionalOf(PresetAmountPump()));
@@ -402,7 +396,7 @@ void main() {
 
       nozzle1StreamSink.send(UpDown.down);
 
-      await clearSaleStreamReference.stream.first;
+      await clearSaleStreamReference.object.first;
     });
 
     test('All pumps switch two times', () async {
@@ -443,7 +437,7 @@ void main() {
 
         nozzle1StreamSink.send(UpDown.down);
 
-        await clearSaleStreamReference.stream.first;
+        await clearSaleStreamReference.object.first;
 
         runTransaction(
             () => pumpLogicStateSink.sendOptionalOf(PresetAmountPump()));
@@ -454,7 +448,7 @@ void main() {
 
         nozzle1StreamSink.send(UpDown.down);
 
-        await clearSaleStreamReference.stream.first;
+        await clearSaleStreamReference.object.first;
       }
     });
   });

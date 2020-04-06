@@ -2,26 +2,15 @@ import 'dart:async';
 import 'dart:collection';
 
 import '../reference.dart';
-import '../node.dart';
-
+import 'node.dart';
 import 'node_evaluation.dart';
 
 typedef TransactionHandler = void Function(Transaction transaction);
 typedef TransactionRunner<T> = T Function(Transaction transaction);
+typedef OnUnreferencedHandler = void Function();
+typedef OnUnreferencedInterceptor = void Function(Node, OnUnreferencedHandler);
 
-enum TransactionPhase { OPENED, EVALUATION, COMMIT, PUBLISH, CLOSING, CLOSED }
-
-void cleanAllListenNodes() {
-  Transaction._globalListenNodes.clear();
-}
-
-void assertAllListenNodes() {
-  if (Transaction._globalListenNodes.isNotEmpty) {
-    print('Listen nodes: ${Transaction._globalListenNodes}');
-
-    throw AssertionError('Not all listen nodes removed');
-  }
-}
+enum TransactionPhase { opened, evaluation, commit, publish, closing, closed }
 
 class Transaction {
   static const String _transactionZoneParameter = 'transaction';
@@ -30,28 +19,29 @@ class Transaction {
   static final Map<Node, TransactionHandler> _globalListenNodes =
       Map.identity();
 
-  static bool _isInitialized = false;
-
   static bool get isInTransaction => currentTransaction != null;
 
-  static Transaction get requiredTransaction => currentTransaction != null
-      ? currentTransaction
-      : throw UnsupportedError('Required explicit transaction');
+  static Transaction get requiredTransaction =>
+      currentTransaction ??
+      (throw UnsupportedError('Required explicit transaction'));
 
   static Transaction get currentTransaction {
     final Transaction transaction = Zone.current[_transactionZoneParameter];
 
-    return transaction != null && transaction.phase != TransactionPhase.CLOSED
+    return transaction != null && transaction.phase != TransactionPhase.closed
         ? transaction
         : null;
   }
 
-  static void init() {
-    if (!_isInitialized) {
-      _isInitialized = true;
-      Node.onNodeAddedHandler = Transaction.onNodeAdded;
-      Node.onNodeRemovedHandler = Transaction.onNodeRemoved;
-      Node.onEvaluationTypeUpdatedHandler = Transaction.onEvaluationTypeUpdated;
+  static void cleanState() {
+    _globalListenNodes.clear();
+  }
+
+  static void assertCleanState() {
+    if (_globalListenNodes.isNotEmpty) {
+      print('Listen nodes: $_globalListenNodes');
+
+      throw AssertionError('Not all listen nodes removed');
     }
   }
 
@@ -100,6 +90,16 @@ class Transaction {
     _globalListenNodes.remove(node);
   }
 
+  static void onUnreferencedInterceptor(
+      Node node, OnUnreferencedHandler onUnreferenced) {
+    final transaction = Transaction.currentTransaction;
+    if (transaction?.phase != TransactionPhase.opened) {
+      onUnreferenced();
+    } else {
+      transaction.reference(node);
+    }
+  }
+
   static void onEvaluationTypeUpdated(
       Node node, EvaluationType newValue, EvaluationType oldValue) {
     if (oldValue == EvaluationType.always) {
@@ -127,13 +127,7 @@ class Transaction {
     return delta != 0 ? delta : node2.id - node1.id;
   });
 
-  TransactionPhase _phase = TransactionPhase.OPENED;
-
-  Transaction() {
-    if (!_isInitialized) {
-      throw StateError('Transaction not initialized');
-    }
-  }
+  TransactionPhase _phase = TransactionPhase.opened;
 
   TransactionPhase get phase => _phase;
 
@@ -145,7 +139,7 @@ class Transaction {
       print('Uncaught error: $error\n $stacktrace');
 
   bool hasValue(Node node) =>
-      _phase == TransactionPhase.OPENED || _phase == TransactionPhase.CLOSING
+      _phase == TransactionPhase.opened || _phase == TransactionPhase.closing
           ? _evaluations.containsKey(node)
           : throw UnsupportedError(
               'Node value is exposed only in opened/closing transaction phase');
@@ -155,8 +149,8 @@ class Transaction {
       : throw StateError('Not evaluated');
 
   void setValue<S>(Node<S> node, S output) {
-    if (_phase != TransactionPhase.OPENED ||
-        _phase == TransactionPhase.CLOSING) {
+    if (_phase != TransactionPhase.opened ||
+        _phase == TransactionPhase.closing) {
       throw UnsupportedError(
           'Node value is exposed only in opened/closing transaction phase');
     } else if (!node.isReferenced) {
@@ -167,17 +161,17 @@ class Transaction {
   }
 
   void _close() {
-    if (phase == TransactionPhase.CLOSED) {
+    if (phase == TransactionPhase.closed) {
       throw StateError('Transaction is closed');
     }
 
     _referenceGroup.dispose();
 
-    _phase = TransactionPhase.CLOSED;
+    _phase = TransactionPhase.closed;
   }
 
   void _evaluate() {
-    _phase = TransactionPhase.EVALUATION;
+    _phase = TransactionPhase.evaluation;
 
     _pendingNodes.addAll(_globalAlwaysNodes);
 
@@ -230,7 +224,7 @@ class Transaction {
   }
 
   void _commitValue() {
-    _phase = TransactionPhase.COMMIT;
+    _phase = TransactionPhase.commit;
 
     for (final entry in _evaluations.entries) {
       entry.key.commit(entry.value.value);
@@ -238,7 +232,7 @@ class Transaction {
   }
 
   void _publishValue() {
-    _phase = TransactionPhase.PUBLISH;
+    _phase = TransactionPhase.publish;
 
     for (final entry in _evaluations.entries) {
       entry.key.publish(entry.value.value);
@@ -246,7 +240,7 @@ class Transaction {
   }
 
   void _notifyClosingTransaction() {
-    _phase = TransactionPhase.CLOSING;
+    _phase = TransactionPhase.closing;
 
     for (final handler in _globalListenNodes.values.toList()) {
       handler(this);

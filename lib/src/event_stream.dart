@@ -1,13 +1,12 @@
 import 'package:frappe/frappe.dart';
 import 'package:optional/optional.dart';
 
+import 'frappe_object.dart';
 import 'reference.dart';
 import 'node.dart';
 import 'listen_subscription.dart';
 import 'typedef.dart';
 import 'value_state.dart';
-
-Node<E> getEventStreamNode<E>(EventStream<E> stream) => stream._node;
 
 EventStream<E> createEventStream<E>(Node<E> node) => EventStream._(node);
 
@@ -23,18 +22,8 @@ Merger<E> _defaultMergerFactory<E>() => (E value1, E value2) => value1;
 NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
     inputs.evaluation;
 
-class EventStreamReference<ES extends EventStream> implements Disposable {
-  final ES stream;
-
-  final Reference<Node> _reference;
-
-  EventStreamReference(this.stream)
-      : _reference = Reference(getEventStreamNode(stream));
-
-  bool get isDisposed => _reference.isDisposed;
-
-  @override
-  void dispose() => _reference.dispose();
+extension ExtendedEventStream<E> on EventStream<E> {
+  Node<E> get node => _node;
 }
 
 class EventStreamSink<E> {
@@ -100,7 +89,7 @@ class EventStreamLink<E> {
 
   void connect(EventStream<E> stream) => Transaction.runRequired((_) {
         if (isConnected) {
-          throw StateError("Link already connected");
+          throw StateError('Link already connected');
         }
 
         _node.link(stream._node);
@@ -124,7 +113,7 @@ class OptionalEventStreamLink<E> extends EventStreamLink<Optional<E>> {
       super.connect(stream);
 }
 
-class EventStream<E> {
+class EventStream<E> extends FrappeObject<E> {
   final Node<E> _node;
 
   EventStream.never()
@@ -200,8 +189,8 @@ class EventStream<E> {
         return OptionalEventStream._(targetNode);
       });
 
-  EventStreamReference<EventStream<E>> toReference() =>
-      EventStreamReference(this);
+  @override
+  FrappeReference<EventStream<E>> toReference() => FrappeReference(this);
 
   ValueState<E> toState(E initValue) => toStateLazy(LazyValue(initValue));
 
@@ -323,9 +312,9 @@ class EventStream<E> {
   EventStream<ER> snapshot<V2, ER>(
           ValueState<V2> fromState, Combiner2<E, V2, ER> combiner) =>
       Transaction.runRequired((transaction) {
-        final stream = map((event) => combiner(event, fromState.current()));
+        final stream = map((event) => combiner(event, fromState.getValue()));
 
-        stream._node.reference(getValueStateNode(fromState));
+        stream._node.reference(fromState.node);
 
         return stream;
       });
@@ -358,7 +347,7 @@ class EventStream<E> {
 
   void _sendValue(E event, Merger<E> sinkMerger) {
     Transaction.run((transaction) {
-      if (transaction.phase != TransactionPhase.OPENED) {
+      if (transaction.phase != TransactionPhase.opened) {
         throw UnsupportedError('''Can't send value in callbacks''');
       }
 
@@ -378,8 +367,8 @@ class OptionalEventStream<E> extends EventStream<Optional<E>> {
   OptionalEventStream._(Node<Optional<E>> node) : super._(node);
 
   @override
-  EventStreamReference<OptionalEventStream<E>> toReference() =>
-      EventStreamReference(this);
+  FrappeReference<OptionalEventStream<E>> toReference() =>
+      FrappeReference(this);
 
   @override
   OptionalValueState<E> toState(Optional<E> initValue) =>
@@ -398,7 +387,7 @@ class OptionalEventStream<E> extends EventStream<Optional<E>> {
 }
 
 class _ReferenceListenSubscription extends ListenSubscription {
-  Reference _reference;
+  final Reference _reference;
 
   _ReferenceListenSubscription(this._reference);
 

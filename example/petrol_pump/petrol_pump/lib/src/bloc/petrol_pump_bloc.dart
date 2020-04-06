@@ -3,7 +3,6 @@ import 'package:optional/optional.dart';
 import 'package:quiver/iterables.dart';
 import 'package:frappe/frappe.dart';
 
-import '../util.dart';
 import '../simulator/pump_engine_simulator_impl.dart';
 import '../model.dart';
 import '../petrol_pump.dart';
@@ -58,40 +57,32 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
     ValueStateSink<double>(1.499),
   ]);
 
+  final _references = FrappeReferenceCollector();
+
+  ListenSubscription _subscriptions;
+
   BuiltList<ValueState<double>> _priceSettingStates;
   BuiltList<ValueState<UpDown>> _nozzleStates;
   BuiltList<OptionalValueState<double>> _priceStates;
-
-  BuiltList<ValueStateReference<ValueState<double>>>
-      _priceSettingStateReferences;
-  BuiltList<ValueStateReference<ValueState<UpDown>>> _nozzleStateReferences;
-  BuiltList<ValueStateReference<OptionalValueState<double>>>
-      _priceStateReferences;
-  ValueStateReference<OptionalValueState<double>> _presetStateReference;
-  ValueStateReference<OptionalValueState<double>> _saleCostStateReference;
-  ValueStateReference<OptionalValueState<double>> _saleQuantityStateReference;
-  EventStreamReference<EventStream<int>> _fuelPulsesStreamReference;
-  EventStreamReference<EventStream<Sale>> _saleCompleteStreamReference;
-  EventStreamReference<EventStream<Unit>> _beepStreamReference;
-  ValueStateReference<ValueState<Delivery>> _deliveryStateReference;
+  OptionalValueState<double> _presetState;
+  OptionalValueState<double> _saleCostState;
+  OptionalValueState<double> _saleQuantityState;
+  EventStream<Sale> _saleCompleteStream;
+  EventStream<Unit> _beepStream;
+  ValueState<Delivery> _deliveryState;
 
   PumpEngineSimulator _pumpEngineSimulator;
 
-  ListenSubscription _subscription;
-
   PetrolPumpBlocImpl() {
     runTransaction(() {
-      EventStreamLink<int> _fuelPulsesStreamLink = EventStreamLink();
+      final _fuelPulsesStreamLink = EventStreamLink<int>();
 
-      _fuelPulsesStreamReference = _fuelPulsesStreamLink.stream.toReference();
-
-      _priceSettingStateReferences = BuiltList.of(
-          _priceSettingStateSinks.map((sink) => sink.state.toReference()));
+      _references.add(_fuelPulsesStreamLink.stream);
 
       _priceSettingStates = BuiltList.of(
-          _priceSettingStateReferences.map((reference) => reference.state));
+          _priceSettingStateSinks.map((sink) => _references.add(sink.state)));
 
-      _nozzleStateReferences = BuiltList.of(range(1, 4).map((number) {
+      _nozzleStates = BuiltList.of(range(1, 4).map((number) {
         final initialState = UpDown.down;
 
         final nozzleStateRef = ValueStateLink<UpDown>();
@@ -102,15 +93,12 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
                 (_, nozzle) => nozzle == UpDown.up ? UpDown.down : UpDown.up)
             .toState(initialState));
 
-        return nozzleStateRef.state.toReference();
+        return _references.add(nozzleStateRef.state);
       }));
 
-      _nozzleStates = BuiltList.of(
-          _nozzleStateReferences.map((reference) => reference.state));
-
-      final nozzle1Stream = _nozzleStateReferences[0].state.toUpdates();
-      final nozzle2Stream = _nozzleStateReferences[1].state.toUpdates();
-      final nozzle3Stream = _nozzleStateReferences[2].state.toUpdates();
+      final nozzle1Stream = _nozzleStates[0].toUpdates();
+      final nozzle2Stream = _nozzleStates[1].toUpdates();
+      final nozzle3Stream = _nozzleStates[2].toUpdates();
 
       final calibrationStateSink = ValueStateSink<double>(0.001);
 
@@ -165,63 +153,39 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
           PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
       _fuelPulsesStreamLink.connect(_pumpEngineSimulator.fuelPulsesStream);
 
-      _priceStateReferences = BuiltList.of([
-        outputs.priceLcd1State
-            .map(fromLcdMapper)
-            .asOptional<double>()
-            .toReference(),
-        outputs.priceLcd2State
-            .map(fromLcdMapper)
-            .asOptional<double>()
-            .toReference(),
-        outputs.priceLcd3State
-            .map(fromLcdMapper)
-            .asOptional<double>()
-            .toReference(),
+      _priceStates = BuiltList.of([
+        _references.add(
+            outputs.priceLcd1State.map(fromLcdMapper).asOptional<double>()),
+        _references.add(
+            outputs.priceLcd2State.map(fromLcdMapper).asOptional<double>()),
+        _references.add(
+            outputs.priceLcd3State.map(fromLcdMapper).asOptional<double>()),
       ]);
 
-      _priceStates = BuiltList.of(
-          _priceStateReferences.map((reference) => reference.state));
+      _presetState = _references
+          .add(outputs.presetLcdState.map(fromLcdMapper).asOptional<double>());
 
-      _presetStateReference = outputs.presetLcdState
-          .map(fromLcdMapper)
-          .asOptional<double>()
-          .toReference();
+      _saleCostState = _references.add(
+          outputs.saleCostLcdState.map(fromLcdMapper).asOptional<double>());
 
-      _saleCostStateReference = outputs.saleCostLcdState
-          .map(fromLcdMapper)
-          .asOptional<double>()
-          .toReference();
+      _saleQuantityState = _references.add(
+          outputs.saleQuantityLcdState.map(fromLcdMapper).asOptional<double>());
 
-      _saleQuantityStateReference = outputs.saleQuantityLcdState
-          .map(fromLcdMapper)
-          .asOptional<double>()
-          .toReference();
+      _saleCompleteStream = _references.add(outputs.saleCompleteStream);
 
-      _saleCompleteStreamReference = outputs.saleCompleteStream.toReference();
+      _beepStream = _references.add(outputs.beepStream);
 
-      _beepStreamReference = outputs.beepStream.toReference();
+      _deliveryState = _references.add(outputs.deliveryState);
 
-      _deliveryStateReference = outputs.deliveryState.toReference();
-
-      _subscription = ListenSubscription()
+      _subscriptions = ListenSubscription()
         ..append(outputs.saleCostLcdState.listen(print));
     });
   }
 
   @override
   void dispose() {
-    _subscription.cancel();
-    _fuelPulsesStreamReference.dispose();
-    _priceSettingStateReferences.dispose();
-    _nozzleStateReferences.dispose();
-    _priceStateReferences.dispose();
-    _presetStateReference.dispose();
-    _saleCostStateReference.dispose();
-    _saleQuantityStateReference.dispose();
-    _saleCompleteStreamReference.dispose();
-    _deliveryStateReference.dispose();
-    _beepStreamReference.dispose();
+    _subscriptions.cancel();
+    _references.dispose();
     _pumpLogicStateSink.close();
     _toggleNozzleStreamSink.close();
     _pumpEngineSimulator.dispose();
@@ -240,24 +204,22 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
   BuiltList<OptionalValueState<double>> get priceStates => _priceStates;
 
   @override
-  OptionalValueState<double> get presetState => _presetStateReference.state;
+  OptionalValueState<double> get presetState => _presetState;
 
   @override
-  OptionalValueState<double> get saleCostState => _saleCostStateReference.state;
+  OptionalValueState<double> get saleCostState => _saleCostState;
 
   @override
-  OptionalValueState<double> get saleQuantityState =>
-      _saleQuantityStateReference.state;
+  OptionalValueState<double> get saleQuantityState => _saleQuantityState;
 
   @override
-  EventStream<Sale> get saleCompleteStream =>
-      _saleCompleteStreamReference.stream;
+  EventStream<Sale> get saleCompleteStream => _saleCompleteStream;
 
   @override
-  EventStream<Unit> get beepStream => _beepStreamReference.stream;
+  EventStream<Unit> get beepStream => _beepStream;
 
   @override
-  ValueState<Delivery> get deliveryState => _deliveryStateReference.state;
+  ValueState<Delivery> get deliveryState => _deliveryState;
 
   @override
   void toggleNozzle(int number) {

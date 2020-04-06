@@ -1,14 +1,15 @@
 library frappe;
 
-export 'src/base.dart' show cleanUp, assertCleanup;
 export 'src/disposable.dart';
 export 'src/listen_subscription.dart';
 export 'src/typedef.dart';
 export 'src/unit.dart';
 export 'src/transaction.dart';
+export 'src/frappe_object.dart' show FrappeObject;
+export 'src/frappe_reference.dart'
+    show FrappeReferenceCollector, FrappeReference;
 export 'src/event_stream.dart'
     show
-        EventStreamReference,
         EventStream,
         OptionalEventStream,
         EventStreamLink,
@@ -17,7 +18,6 @@ export 'src/event_stream.dart'
         OptionalEventStreamSink;
 export 'src/value_state.dart'
     show
-        ValueStateReference,
         ValueState,
         OptionalValueState,
         ValueStateSink,

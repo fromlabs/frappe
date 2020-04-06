@@ -1,22 +1,16 @@
 import 'dart:collection';
 
 import 'package:frappe/frappe.dart';
-import 'package:frappe/src/event_stream.dart';
-import 'package:frappe/src/transaction.dart';
 import 'package:optional/optional.dart';
 import 'package:test/test.dart';
 
 void main() {
-  setUpAll(() {
-    initTransaction();
-  });
-
   setUp(() {
-    cleanUp();
+    FrappeObject.cleanState();
   });
 
   tearDown(() {
-    assertCleanup();
+    FrappeObject.assertCleanState();
   });
 
   group('EventStream', () {
@@ -533,7 +527,7 @@ void main() {
       final events1 = Queue<int>();
 
       EventStreamSink<int> sink;
-      EventStreamReference<EventStream<int>> streamReference;
+      FrappeReference<EventStream<int>> streamReference;
 
       runTransaction(() {
         sink = EventStreamSink<int>();
@@ -545,7 +539,7 @@ void main() {
       final subscription1 = runTransaction(() {
         sink.send(1);
 
-        return streamReference.stream.listen((event) {
+        return streamReference.object.listen((event) {
           events1.addLast(event);
         });
       });

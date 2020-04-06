@@ -1,7 +1,6 @@
 import 'package:frappe/frappe.dart';
-import 'package:frappe/src/base.dart';
 
-Future<void> main() async {
+void main() {
   // event stream sink
   final plusStreamSink = EventStreamSink<Unit>();
   final minusStreamSink = EventStreamSink<Unit>();
@@ -10,59 +9,68 @@ Future<void> main() async {
   final plusStream = plusStreamSink.stream;
   final minusStream = minusStreamSink.stream;
 
-  // mapTo/map operator
-  final incrementStream = plusStream.mapTo<int>(1);
-  final decrementStream = minusStream.mapTo<int>(-1);
+  FrappeReference<ValueState<int>> totalStateReference;
 
-  // orElse/merge operator
-  final deltaStream = incrementStream.orElse(decrementStream);
+  ListenSubscription subscription;
 
-  // value state reference (for cyclic dependencies)
-  final totalStateReference = ValueStateLink<int>();
+  runTransaction(() {
+    // mapTo/map operator
+    final incrementStream = plusStream.mapTo<int>(1);
+    final decrementStream = minusStream.mapTo<int>(-1);
 
-  // value state
-  final totalState = totalStateReference.state;
+    // orElse/merge operator
+    final deltaStream = incrementStream.orElse(decrementStream);
 
-  // snapshot operator
-  final totalUpdateStream = deltaStream.snapshot<int, int>(
-      totalState, (delta, total) => total + delta);
+    // value state reference (for cyclic dependencies)
+    final totalStateLink = ValueStateLink<int>();
 
-  // event stream to value state conversion
-  final updatedTotalState = totalUpdateStream.toState(0);
+    // value state
+    final totalState = totalStateLink.state;
 
-  // lazy reference link
-  totalStateReference.connect(updatedTotalState);
+    // hold reference to state
+    totalStateReference = totalState.toReference();
 
-  // adding listeners
-  final subscription = plusStream
-      .listen((_) => print('+'))
-      .append(minusStream.listen((_) => print('-')))
-      .append(totalState.listen((total) => print('Updated total: $total')));
+    // snapshot operator
+    final totalUpdateStream = deltaStream.snapshot<int, int>(
+        totalState, (delta, total) => total + delta);
 
-  print('Initial total: ${totalState.current}');
+    // event stream to value state conversion
+    final updatedTotalState = totalUpdateStream.toState(0);
+
+    // lazy reference link
+    totalStateLink.connect(updatedTotalState);
+
+    // adding listeners
+    subscription = plusStream
+        .listen((_) => print('+'))
+        .append(minusStream.listen((_) => print('-')))
+        .append(totalState.listen((total) => print('Updated total: $total')));
+  });
+
+  print('Initial total: ${totalStateReference.object.getValue()}');
 
   plusStreamSink.send(unit);
-  await delay;
 
   plusStreamSink.send(unit);
-  await delay;
 
   plusStreamSink.send(unit);
-  await delay;
 
   minusStreamSink.send(unit);
-  await delay;
 
   minusStreamSink.send(unit);
-  await delay;
 
-  print('Final total: ${totalState.current}');
+  print('Final total: ${totalStateReference.object.getValue()}');
 
   // removing listeners
-  await subscription.cancel();
+  subscription.cancel();
+
+  // dispose reference to state
+  totalStateReference.dispose();
+
+  // close sinks
+  plusStreamSink.close();
+  minusStreamSink.close();
 
   // check if all listeners are canceled
-  assertCleanup();
+  FrappeObject.assertCleanState();
 }
-
-Future<void> get delay => Future(() {});

@@ -8,6 +8,15 @@ abstract class Disposable {
   FutureOr<void> dispose();
 }
 
+class DisposableCollector implements Disposable {
+  final _disposables = <Disposable>[];
+
+  @override
+  Future<void> dispose() => Future.wait(_disposables
+      .map<FutureOr>((disposable) => disposable.dispose())
+      .whereType<Future>());
+}
+
 class EventStreamSinkDisposable implements Disposable {
   final EventStreamSink _eventStreamSink;
 
@@ -41,7 +50,7 @@ class StreamSubscriptionDisposable implements Disposable {
   StreamSubscriptionDisposable(this._streamSubscription);
 
   @override
-  FutureOr<void> dispose() => _streamSubscription?.cancel();
+  Future<void> dispose() => _streamSubscription?.cancel();
 }
 
 class StreamControllerDisposable implements Disposable {
@@ -50,5 +59,5 @@ class StreamControllerDisposable implements Disposable {
   StreamControllerDisposable(this._streamController);
 
   @override
-  FutureOr<void> dispose() => _streamController?.close();
+  Future<void> dispose() => _streamController?.close();
 }

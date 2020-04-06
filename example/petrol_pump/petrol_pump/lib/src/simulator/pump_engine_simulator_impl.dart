@@ -46,7 +46,7 @@ class PumpEngineSimulatorImpl implements PumpEngineSimulator {
           .gate(disposePendingState.map((pending) => !pending))
           .listen((_) async {
         int pulses;
-        switch (_deliveryState.current()) {
+        switch (_deliveryState.getValue()) {
           case Delivery.fast1:
           case Delivery.fast2:
           case Delivery.fast3:

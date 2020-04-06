@@ -14,3 +14,4 @@ doc/api/
 *.code-workspace
 .vscode
 .metadata
+.idea

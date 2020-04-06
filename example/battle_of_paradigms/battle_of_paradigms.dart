@@ -55,33 +55,31 @@ class FrpParadigm implements Paradigm {
 
   FrpParadigm(Document initDocument, DocumentListener documentListener) {
     // TODO sistemare ValueStateReference(initDocument);
-    ValueStateLink<Document> documentStateReference =
-        ValueStateLink();
+    final documentStateReference = ValueStateLink<Document>();
 
-    EventStream<Document> idleStream = EventStream.never();
+    final idleStream = EventStream<Document>.never();
 
-    EventStream<EventStream<Document>> startDragStream = mouseEventStreamSink
-        .stream
+    final startDragStream = mouseEventStreamSink.stream
         .where((event) => event.type == MouseEventType.DOWN)
         .snapshot<Document, Optional<EventStream<Document>>>(
-            documentStateReference.state, (startEvent, document) => document.getByPoint(startEvent.point).map((entry) =>
-              mouseEventStreamSink.stream
-                  .where((event) => event.type == MouseEventType.MOVE)
-                  .snapshot<Document, Document>(
-                      documentStateReference.state,
-                      (dragEvent, document) => document.insert(
-                          entry.id,
-                          entry.element
-                              .translate(startEvent.point, dragEvent.point)))))
+            documentStateReference.state,
+            (startEvent, document) => document.getByPoint(startEvent.point).map(
+                (entry) => mouseEventStreamSink.stream
+                    .where((event) => event.type == MouseEventType.MOVE)
+                    .snapshot<Document, Document>(
+                        documentStateReference.state,
+                        (dragEvent, document) => document.insert(
+                            entry.id,
+                            entry.element.translate(
+                                startEvent.point, dragEvent.point)))))
         .asOptional<EventStream<Document>>()
         .mapWhereOptional();
 
-    EventStream<EventStream<Document>> endDragStream = mouseEventStreamSink
-        .stream
+    final endDragStream = mouseEventStreamSink.stream
         .where((event) => event.type == MouseEventType.UP)
         .mapTo(idleStream);
 
-    EventStream<Document> documentUpdatedStream = ValueState.switchStream(
+    final documentUpdatedStream = ValueState.switchStream(
         startDragStream.orElse(endDragStream).toState(idleStream));
 
     documentUpdateSubscription = documentUpdatedStream
