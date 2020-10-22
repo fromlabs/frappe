@@ -1,47 +1,63 @@
 const String defaultEvaluationKey = 'default';
 
-class NodeEvaluation<S> {
-  final S _value;
+abstract class NodeEvaluation<S> {
+  factory NodeEvaluation(S value) => _NodeEvaluation<S>(value);
 
-  final bool isEvaluated;
+  factory NodeEvaluation.not() => _NotNodeEvaluation<S>();
 
-  NodeEvaluation(this._value) : isEvaluated = true;
+  bool get isEvaluated;
 
-  NodeEvaluation.not()
-      : isEvaluated = false,
-        _value = null;
+  bool get isNotEvaluated;
+
+  S get value;
+}
+
+class _NodeEvaluation<S> implements NodeEvaluation<S> {
+  final S value;
+
+  final bool isEvaluated = true;
+
+  _NodeEvaluation(this.value);
 
   bool get isNotEvaluated => !isEvaluated;
-
-  S get value => isEvaluated ? _value : throw StateError('Not evaluated');
 
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) {
       return true;
     } else {
-      return other is NodeEvaluation<S> &&
-          isEvaluated == other.isEvaluated &&
-          _value == other._value;
+      return other is _NodeEvaluation<S> && value == value;
     }
   }
 
   @override
-  int get hashCode => _jf(_jc(_jc(0, isEvaluated.hashCode), _value.hashCode));
+  int get hashCode => value.hashCode;
 
   @override
-  String toString() =>
-      '${isEvaluated ? 'NodeEvaluation($_value)' : 'NodeEvaluation.not()'}';
+  String toString() => 'NodeEvaluation($value)';
 }
 
-int _jc(int hash, int value) {
-  hash = 0x1fffffff & (hash + value);
-  hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
-  return hash ^ (hash >> 6);
-}
+class _NotNodeEvaluation<S> implements NodeEvaluation<S> {
+  final bool isEvaluated = false;
 
-int _jf(int hash) {
-  hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
-  hash = hash ^ (hash >> 11);
-  return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
+  const _NotNodeEvaluation();
+
+  bool get isNotEvaluated => !isEvaluated;
+
+  S get value => throw StateError('Not evaluated');
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) {
+      return true;
+    } else {
+      return other is _NodeEvaluation<S>;
+    }
+  }
+
+  @override
+  int get hashCode => 0;
+
+  @override
+  String toString() => 'NodeEvaluation.not()';
 }

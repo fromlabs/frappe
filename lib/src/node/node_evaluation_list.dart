@@ -1,5 +1,5 @@
-import 'node_evaluation.dart';
-import 'node_evaluation_collection.dart';
+import 'package:frappe/src/node/node_evaluation.dart';
+import 'package:frappe/src/node/node_evaluation_collection.dart';
 
 class NodeEvaluationList extends NodeEvaluationCollection {
   final List<NodeEvaluation> evaluations;

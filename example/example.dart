@@ -9,9 +9,9 @@ void main() {
   final plusStream = plusStreamSink.stream;
   final minusStream = minusStreamSink.stream;
 
-  FrappeReference<ValueState<int>> totalStateReference;
+  late final FrappeReference<ValueState<int>> totalStateReference;
 
-  ListenSubscription subscription;
+  late final ListenSubscription subscription;
 
   runTransaction(() {
     // mapTo/map operator
@@ -21,7 +21,7 @@ void main() {
     // orElse/merge operator
     final deltaStream = incrementStream.orElse(decrementStream);
 
-    // value state reference (for cyclic dependencies)
+    // value state link (for cyclic dependencies)
     final totalStateLink = ValueStateLink<int>();
 
     // value state
@@ -37,7 +37,7 @@ void main() {
     // event stream to value state conversion
     final updatedTotalState = totalUpdateStream.toState(0);
 
-    // lazy reference link
+    // lazy state link connection
     totalStateLink.connect(updatedTotalState);
 
     // adding listeners
@@ -49,15 +49,15 @@ void main() {
 
   print('Initial total: ${totalStateReference.object.getValue()}');
 
-  plusStreamSink.send(unit);
+  plusStreamSink.send(unit); // +
 
-  plusStreamSink.send(unit);
+  plusStreamSink.send(unit); // +
 
-  plusStreamSink.send(unit);
+  plusStreamSink.send(unit); // +
 
-  minusStreamSink.send(unit);
+  minusStreamSink.send(unit); // -
 
-  minusStreamSink.send(unit);
+  minusStreamSink.send(unit); // -
 
   print('Final total: ${totalStateReference.object.getValue()}');
 
@@ -71,6 +71,6 @@ void main() {
   plusStreamSink.close();
   minusStreamSink.close();
 
-  // check if all listeners are canceled
+  // assert that all listeners are canceled
   FrappeObject.assertCleanState();
 }

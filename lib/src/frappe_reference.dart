@@ -1,7 +1,7 @@
-import 'disposable.dart';
-import 'frappe_object.dart';
-import 'node.dart';
-import 'reference.dart';
+import 'package:frappe/src/disposable.dart';
+import 'package:frappe/src/frappe_object.dart';
+import 'package:frappe/src/node.dart';
+import 'package:frappe/src/reference.dart';
 
 class FrappeReferenceCollector implements Disposable {
   final _references = <FrappeReference>[];

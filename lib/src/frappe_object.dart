@@ -1,9 +1,8 @@
-import 'package:frappe/frappe.dart';
 import 'package:frappe/src/event_stream.dart';
+import 'package:frappe/src/frappe_reference.dart';
+import 'package:frappe/src/node.dart';
+import 'package:frappe/src/reference.dart';
 import 'package:frappe/src/value_state.dart';
-
-import 'node.dart';
-import 'reference.dart';
 
 extension ExtendedFrappeObject<T> on FrappeObject<T> {
   Node<T> get node {

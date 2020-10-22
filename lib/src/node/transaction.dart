@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
 
-import '../reference.dart';
-import 'node.dart';
-import 'node_evaluation.dart';
+import 'package:frappe/src/node/node.dart';
+import 'package:frappe/src/node/node_evaluation.dart';
+import 'package:frappe/src/reference.dart';
 
 typedef TransactionHandler = void Function(Transaction transaction);
 typedef TransactionRunner<T> = T Function(Transaction transaction);
@@ -25,8 +25,8 @@ class Transaction {
       currentTransaction ??
       (throw UnsupportedError('Required explicit transaction'));
 
-  static Transaction get currentTransaction {
-    final Transaction transaction = Zone.current[_transactionZoneParameter];
+  static Transaction? get currentTransaction {
+    final Transaction? transaction = Zone.current[_transactionZoneParameter];
 
     return transaction != null && transaction.phase != TransactionPhase.closed
         ? transaction
@@ -50,9 +50,9 @@ class Transaction {
 
   static T run<T>(TransactionRunner<T> runner) {
     if (isInTransaction) {
-      return runner(currentTransaction);
+      return runner(requiredTransaction);
     } else {
-      Transaction transaction;
+      late final Transaction transaction;
 
       try {
         transaction = Transaction();
@@ -72,7 +72,7 @@ class Transaction {
         }, zoneValues: {_transactionZoneParameter: transaction});
         return result;
       } finally {
-        transaction?._close();
+        transaction._close();
       }
     }
   }
@@ -93,10 +93,11 @@ class Transaction {
   static void onUnreferencedInterceptor(
       Node node, OnUnreferencedHandler onUnreferenced) {
     final transaction = Transaction.currentTransaction;
-    if (transaction?.phase != TransactionPhase.opened) {
-      onUnreferenced();
-    } else {
+
+    if (transaction != null && transaction.phase == TransactionPhase.opened) {
       transaction.reference(node);
+    } else {
+      onUnreferenced();
     }
   }
 
@@ -145,7 +146,7 @@ class Transaction {
               'Node value is exposed only in opened/closing transaction phase');
 
   S getValue<S>(Node<S> node) => hasValue(node)
-      ? _evaluations[node].value
+      ? _evaluations[node]!.value
       : throw StateError('Not evaluated');
 
   void setValue<S>(Node<S> node, S output) {
@@ -201,10 +202,10 @@ class Transaction {
     if (!_evaluations.containsKey(node) &&
         node.evaluationType != EvaluationType.never) {
       final inputs = node.createEvaluationInputs(node.sourceReferences.entries
-          .map<MapEntry<dynamic, NodeEvaluation>>((entry) => MapEntry(
+          .map<MapEntry<dynamic, NodeEvaluation?>>((entry) => MapEntry(
               entry.key,
               _evaluations.containsKey(entry.value.value)
-                  ? _evaluations[entry.value.value]
+                  ? _evaluations[entry.value.value]!
                   : null)));
 
       if (forceEvaluation || inputs.allInputsEvaluated) {

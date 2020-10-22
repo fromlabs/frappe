@@ -1,71 +1,33 @@
-import 'package:optional/optional.dart';
+import 'package:frappe/src/event_stream.dart';
+import 'package:frappe/src/frappe_object.dart';
+import 'package:frappe/src/frappe_reference.dart';
+import 'package:frappe/src/lazy_value.dart';
+import 'package:frappe/src/listen_subscription.dart';
+import 'package:frappe/src/node.dart';
+import 'package:frappe/src/reference.dart';
+import 'package:frappe/src/typedef.dart';
 
-import 'frappe_object.dart';
-import 'frappe_reference.dart';
-import 'reference.dart';
-import 'node.dart';
-import 'transaction.dart';
-import 'event_stream.dart';
-import 'listen_subscription.dart';
-import 'typedef.dart';
+extension ExtendedValueState<V> on ValueState<V> {
+  Node<V> get node => _node;
+}
 
 ValueState<V> createValueState<V>(
         LazyValue<V> lazyInitValue, EventStream<V> stream) =>
     ValueState._(lazyInitValue, stream);
 
 NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
-    inputs.evaluation;
-
-extension ExtendedValueState<V> on ValueState<V> {
-  Node<V> get node => _node;
-}
-
-class LazyValue<V> {
-  final ValueProvider<V> _provider;
-  bool hasValue = false;
-  V _value;
-
-  LazyValue(V value)
-      : _provider = null,
-        hasValue = true,
-        _value = value;
-
-  LazyValue.undefined()
-      : _provider = (() => throw StateError('Lazy value undefined'));
-
-  LazyValue.provide(this._provider);
-
-  static LazyValue<VR> combines<VR>(
-          Iterable<LazyValue> lazyValues, Combiners<VR> combiner) =>
-      LazyValue.provide(
-          () => combiner(lazyValues.map((lazyValue) => lazyValue.get())));
-
-  V get() => Transaction.runRequired((_) {
-        if (hasValue) {
-          return _value;
-        } else {
-          _value = _provider();
-          hasValue = true;
-          return _value;
-        }
-      });
-
-  LazyValue<VR> map<VR>(Mapper<V, VR> mapper) =>
-      Transaction.runRequired((_) => LazyValue.provide(() => mapper(get())));
-
-  LazyValue<Optional<VV>> _castOptional<VV>() =>
-      this as LazyValue<Optional<VV>>;
-}
+    inputs.evaluation as NodeEvaluation<E>;
 
 class ValueStateSink<V> {
   final ValueState<V> state;
 
   final EventStreamSink<V> _eventStreamSink;
 
-  factory ValueStateSink(V initValue, [Merger<V> merger]) =>
+  factory ValueStateSink(V initValue, [Merger<V>? merger]) =>
       ValueStateSink.lazy(LazyValue(initValue), merger);
 
-  factory ValueStateSink.lazy(LazyValue<V> lazyInitValue, [Merger<V> merger]) =>
+  factory ValueStateSink.lazy(LazyValue<V> lazyInitValue,
+          [Merger<V>? merger]) =>
       Transaction.run((transaction) {
         final eventStreamSink = EventStreamSink<V>(merger);
 
@@ -83,6 +45,7 @@ class ValueStateSink<V> {
   void send(V value) => _eventStreamSink.send(value);
 }
 
+/*
 class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
   factory OptionalValueStateSink(Optional<V> initValue,
           [Merger<Optional<V>> merger]) =>
@@ -116,13 +79,13 @@ class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
 
   void sendOptionalOf(V value) => send(Optional<V>.of(value));
 }
-
+*/
 class ValueStateLink<V> {
   final ValueState<V> state;
-  LazyValue<V> _connectedLazyValue;
+  late final LazyValue<V> _connectedLazyValue;
 
   factory ValueStateLink() => Transaction.runRequired((transaction) {
-        ValueStateLink<V> link;
+        late final ValueStateLink<V> link;
 
         link = ValueStateLink._(ValueState<V>._(
             LazyValue<V>.provide(() => link.isConnected
@@ -149,9 +112,10 @@ class ValueStateLink<V> {
         _node.link(state._node);
       });
 
-  KeyNode<V> get _node => state._node;
+  KeyNode<V> get _node => state._node as KeyNode<V>;
 }
 
+/*
 class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
   factory OptionalValueStateLink() {
     OptionalValueStateLink<V> link;
@@ -175,13 +139,13 @@ class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
   @override
   void connect(covariant OptionalValueState<V> state) => super.connect(state);
 }
-
+*/
 class ValueState<V> extends FrappeObject<V> {
-  LazyValue<V> _currentLazyValue;
-
-  Reference _currentValueReference;
-
   final EventStream<V> _stream;
+
+  late final LazyValue<V> _currentLazyValue;
+
+  Reference? _currentValueReference;
 
   ValueState.constant(V initValue)
       : this._(LazyValue(initValue), EventStream<V>.never());
@@ -275,10 +239,11 @@ class ValueState<V> extends FrappeObject<V> {
 
   LazyValue<V> getLazyValue() => _currentLazyValue;
 
+/*
   OptionalValueState<VV> asOptional<VV>() =>
       Transaction.runRequired((_) => OptionalValueState._(
           getLazyValue()._castOptional<VV>(), _stream.asOptional()));
-
+*/
   @override
   FrappeReference<ValueState<V>> toReference() => FrappeReference(this);
 
@@ -286,8 +251,8 @@ class ValueState<V> extends FrappeObject<V> {
         final targetNode = KeyNode<V>(
             evaluationType: EvaluationType.always,
             evaluateHandler: (inputs) => inputs.evaluation.isEvaluated
-                ? inputs.evaluation
-                : NodeEvaluation(getValue()));
+                ? inputs.evaluation as NodeEvaluation<V>
+                : NodeEvaluation<V>(getValue()));
 
         Transaction.addClosingTransactionHandler(targetNode, (transaction) {
           targetNode.evaluationType = EvaluationType.allInputs;
@@ -303,16 +268,17 @@ class ValueState<V> extends FrappeObject<V> {
   EventStream<V> toUpdates() =>
       Transaction.runRequired((transaction) => _stream);
 
-  ValueState<V> distinct([Equalizer<V> distinctEquals]) =>
+  ValueState<V> distinct([Equalizer<V>? distinctEquals]) =>
       Transaction.runRequired((_) =>
           ValueState._(_currentLazyValue, _stream.distinct(distinctEquals)));
 
   ValueState<VR> map<VR>(Mapper<V, VR> mapper) => Transaction.runRequired(
       (_) => ValueState._(_currentLazyValue.map(mapper), _stream.map(mapper)));
 
+/*
   OptionalValueState<V> mapToOptionalOf() => runTransaction(
       () => map<Optional<V>>((value) => Optional<V>.of(value)).asOptional<V>());
-
+*/
   ValueState<VR> combine<V2, VR>(
           ValueState<V2> state2, Combiner2<V, V2, VR> combiner) =>
       combines<VR>([this, state2], (values) {
@@ -394,7 +360,7 @@ class ValueState<V> extends FrappeObject<V> {
     }
   }
 }
-
+/*
 class OptionalValueState<V> extends ValueState<Optional<V>> {
   OptionalValueState.constant(Optional<V> initValue)
       : super.constant(initValue);
@@ -419,3 +385,4 @@ class OptionalValueState<V> extends ValueState<Optional<V>> {
 
   ValueState<bool> mapIsPresentOptional() => map((value) => value.isPresent);
 }
+*/

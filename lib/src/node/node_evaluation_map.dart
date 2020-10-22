@@ -1,5 +1,5 @@
-import 'node_evaluation.dart';
-import 'node_evaluation_collection.dart';
+import 'package:frappe/src/node/node_evaluation.dart';
+import 'package:frappe/src/node/node_evaluation_collection.dart';
 
 class NodeEvaluationMap extends NodeEvaluationCollection {
   final Map<dynamic, NodeEvaluation> evaluations;
@@ -15,5 +15,6 @@ class NodeEvaluationMap extends NodeEvaluationCollection {
 
   NodeEvaluation operator [](key) => get(key);
 
-  NodeEvaluation<V> get<V>(key) => evaluations[key];
+  NodeEvaluation<V> get<V>(key) =>
+      (evaluations[key] ?? NodeEvaluation.not()) as NodeEvaluation<V>;
 }

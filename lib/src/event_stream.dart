@@ -1,17 +1,26 @@
-import 'package:frappe/frappe.dart';
-import 'package:optional/optional.dart';
+import 'package:frappe/src/frappe_object.dart';
+import 'package:frappe/src/frappe_reference.dart';
+import 'package:frappe/src/lazy_value.dart';
+import 'package:frappe/src/listen_subscription.dart';
+import 'package:frappe/src/node.dart';
+import 'package:frappe/src/node/node.dart';
+import 'package:frappe/src/reference.dart';
+import 'package:frappe/src/typedef.dart';
+import 'package:frappe/src/value_state.dart';
 
-import 'frappe_object.dart';
-import 'reference.dart';
-import 'node.dart';
-import 'listen_subscription.dart';
-import 'typedef.dart';
-import 'value_state.dart';
+extension NullableEventStreamSink<E> on EventStreamSink<E?> {
+  void sendNull() => send(null);
+}
+
+extension NullableEventStream<E> on EventStream<E?> {
+  EventStream<bool> mapIsNull() => map((event) => event == null);
+
+  EventStream<bool> mapIsNotNull() => map((event) => event != null);
+
+  EventStream<E> mapWhereNotNull() => whereType<E>();
+}
 
 EventStream<E> createEventStream<E>(Node<E> node) => EventStream._(node);
-
-OptionalEventStream<E> createOptionalEventStream<E>(Node<Optional<E>> node) =>
-    OptionalEventStream._(node);
 
 Merger<E> _defaultSinkMergerFactory<E>() =>
     (E newValue, E oldValue) => throw UnsupportedError(
@@ -20,7 +29,7 @@ Merger<E> _defaultSinkMergerFactory<E>() =>
 Merger<E> _defaultMergerFactory<E>() => (E value1, E value2) => value1;
 
 NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
-    inputs.evaluation;
+    inputs.evaluation as NodeEvaluation<E>;
 
 extension ExtendedEventStream<E> on EventStream<E> {
   Node<E> get node => _node;
@@ -31,12 +40,12 @@ class EventStreamSink<E> {
   final Reference<Node<E>> _nodeReference;
   final Merger<E> _sinkMerger;
 
-  factory EventStreamSink([Merger<E> sinkMerger]) =>
+  factory EventStreamSink([Merger<E>? sinkMerger]) =>
       Transaction.run((_) => EventStreamSink._(
           EventStream<E>._(KeyNode<E>(evaluationType: EvaluationType.never)),
           sinkMerger));
 
-  EventStreamSink._(this.stream, Merger<E> sinkMerger)
+  EventStreamSink._(this.stream, Merger<E>? sinkMerger)
       : _nodeReference = Reference(stream._node),
         _sinkMerger = sinkMerger ?? _defaultSinkMergerFactory<E>();
 
@@ -53,25 +62,6 @@ class EventStreamSink<E> {
 
     stream._sendValue(event, _sinkMerger);
   }
-}
-
-class OptionalEventStreamSink<E> extends EventStreamSink<Optional<E>> {
-  factory OptionalEventStreamSink([Merger<Optional<E>> sinkMerger]) =>
-      Transaction.run((_) => OptionalEventStreamSink._(
-          OptionalEventStream<E>._(
-              KeyNode<Optional<E>>(evaluationType: EvaluationType.never)),
-          sinkMerger));
-
-  OptionalEventStreamSink._(
-      OptionalEventStream<E> stream, Merger<Optional<E>> sinkMerger)
-      : super._(stream, sinkMerger);
-
-  @override
-  OptionalEventStream<E> get stream => super.stream;
-
-  void sendOptionalEmpty() => send(Optional<E>.empty());
-
-  void sendOptionalOf(E event) => send(Optional<E>.of(event));
 }
 
 class EventStreamLink<E> {
@@ -95,22 +85,7 @@ class EventStreamLink<E> {
         _node.link(stream._node);
       });
 
-  KeyNode<E> get _node => stream._node;
-}
-
-class OptionalEventStreamLink<E> extends EventStreamLink<Optional<E>> {
-  factory OptionalEventStreamLink() => Transaction.runRequired((transaction) =>
-      OptionalEventStreamLink._(OptionalEventStream<E>._(
-          KeyNode<Optional<E>>(evaluateHandler: _defaultEvaluateHandler))));
-
-  OptionalEventStreamLink._(OptionalEventStream<E> stream) : super._(stream);
-
-  @override
-  OptionalEventStream<E> get stream => super.stream;
-
-  @override
-  void connect(covariant OptionalEventStream<E> stream) =>
-      super.connect(stream);
+  KeyNode<E> get _node => stream._node as KeyNode<E>;
 }
 
 class EventStream<E> extends FrappeObject<E> {
@@ -119,19 +94,18 @@ class EventStream<E> extends FrappeObject<E> {
   EventStream.never()
       : _node = KeyNode<E>(evaluationType: EvaluationType.never);
 
-  EventStream._(this._node, [Merger<E> sinkMerger]);
+  EventStream._(this._node);
 
   static EventStream<E> merges<E>(Iterable<EventStream<E>> streams,
-          [Merger<E> merger]) =>
+          [Merger<E>? merger]) =>
       Transaction.runRequired((transaction) {
         final streamList = streams.toList();
         return _merges(transaction, streamList, 0, streamList.length,
             merger ?? _defaultMergerFactory<E>());
       });
 
-  static EventStream<E> _merges<E>(
-      Transaction transaction, List<EventStream<E>> streams, int start, int end,
-      [Merger<E> merger]) {
+  static EventStream<E> _merges<E>(Transaction transaction,
+      List<EventStream<E>> streams, int start, int end, Merger<E> merger) {
     switch (end - start) {
       case 0:
         return EventStream<E>.never();
@@ -150,9 +124,8 @@ class EventStream<E> extends FrappeObject<E> {
     }
   }
 
-  static EventStream<E> _merges2<E>(
-      Transaction transaction, EventStream<E> stream1, EventStream<E> stream2,
-      [Merger<E> merger]) {
+  static EventStream<E> _merges2<E>(Transaction transaction,
+      EventStream<E> stream1, EventStream<E> stream2, Merger<E> merger) {
     const input1 = 'input1';
     const input2 = 'input2';
 
@@ -160,12 +133,12 @@ class EventStream<E> extends FrappeObject<E> {
       evaluationType: EvaluationType.almostOneInput,
       evaluateHandler: (inputs) {
         if (inputs[input1].isNotEvaluated) {
-          return inputs[input2];
+          return inputs[input2] as NodeEvaluation<E>;
         } else if (inputs[input2].isEvaluated) {
           return NodeEvaluation<E>(
               merger(inputs[input1].value, inputs[input2].value));
         } else {
-          return inputs[input1];
+          return inputs[input1] as NodeEvaluation<E>;
         }
       },
     );
@@ -181,14 +154,6 @@ class EventStream<E> extends FrappeObject<E> {
 
   bool get isUnreferenced => !isReferenced;
 
-  OptionalEventStream<EE> asOptional<EE>() =>
-      Transaction.runRequired((transaction) {
-        final targetNode =
-            KeyNode<Optional<EE>>(evaluateHandler: _defaultEvaluateHandler);
-        targetNode.link(_node);
-        return OptionalEventStream._(targetNode);
-      });
-
   @override
   FrappeReference<EventStream<E>> toReference() => FrappeReference(this);
 
@@ -198,7 +163,7 @@ class EventStream<E> extends FrappeObject<E> {
       Transaction.runRequired((_) => createValueState(lazyInitValue, this));
 
   EventStream<E> once() => Transaction.runRequired((transaction) {
-        KeyNode<E> targetNode;
+        late final KeyNode<E> targetNode;
 
         targetNode = KeyNode<E>(
           evaluateHandler: _defaultEvaluateHandler,
@@ -211,21 +176,27 @@ class EventStream<E> extends FrappeObject<E> {
         return EventStream._(targetNode);
       });
 
-  EventStream<E> distinct([Equalizer<E> distinctEquals]) =>
-      Transaction.runRequired((transaction) {
-        var previousEvaluation = NodeEvaluation<E>.not();
-        final targetNode = KeyNode<E>(
-          evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
-                  inputs.evaluation.value != previousEvaluation.value
-              ? inputs.evaluation
-              : NodeEvaluation.not(),
-          commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
-        );
+  EventStream<E> distinct([Equalizer<E>? distinctEquals]) {
+    final equals = distinctEquals ??
+        (E value1, E value2) {
+          return value1 == value2;
+        };
 
-        targetNode.link(_node);
+    return Transaction.runRequired((transaction) {
+      var previousEvaluation = NodeEvaluation<E>.not();
+      final targetNode = KeyNode<E>(
+        evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
+                !equals(inputs.evaluation.value, previousEvaluation.value)
+            ? inputs.evaluation as NodeEvaluation<E>
+            : NodeEvaluation<E>.not(),
+        commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
+      );
 
-        return EventStream._(targetNode);
-      });
+      targetNode.link(_node);
+
+      return EventStream._(targetNode);
+    });
+  }
 
   EventStream<ER> map<ER>(Mapper<E, ER> mapper) =>
       Transaction.runRequired((transaction) {
@@ -240,26 +211,29 @@ class EventStream<E> extends FrappeObject<E> {
 
   EventStream<ER> mapTo<ER>(ER event) => map<ER>((_) => event);
 
-  OptionalEventStream<EE> mapToOptionalEmpty<EE>() =>
-      Transaction.runRequired((transaction) =>
-          mapTo<Optional<EE>>(Optional<EE>.empty()).asOptional<EE>());
+  EventStream<E?> mapToNull() => map<E?>((event) => null);
 
-  OptionalEventStream<E> mapToOptionalOf() =>
-      Transaction.runRequired((transaction) =>
-          map<Optional<E>>((event) => Optional<E>.of(event)).asOptional<E>());
+  EventStream<ER> cast<ER>() => this is EventStream<ER>
+      ? this as EventStream<ER>
+      : map<ER>((event) => event as ER);
+
+  EventStream<E?> castToNullable() => cast<E?>();
 
   EventStream<E> where(Filter<E> filter) =>
       Transaction.runRequired((transaction) {
         final targetNode = KeyNode<E>(
           evaluateHandler: (inputs) => filter(inputs.evaluation.value)
-              ? inputs.evaluation
-              : NodeEvaluation.not(),
+              ? inputs.evaluation as NodeEvaluation<E>
+              : NodeEvaluation<E>.not(),
         );
 
         targetNode.link(_node);
 
         return EventStream._(targetNode);
       });
+
+  EventStream<ER> whereType<ER>() => Transaction.runRequired(
+      (transaction) => where((event) => event is ER).cast<ER>());
 
   ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) =>
       Transaction.runRequired((transaction) {
@@ -297,12 +271,9 @@ class EventStream<E> extends FrappeObject<E> {
       });
 
   EventStream<E> gate(ValueState<bool> conditionState) =>
-      Transaction.runRequired((transaction) => snapshot(
-              conditionState,
-              (event, condition) =>
-                  condition ? Optional<E>.of(event) : Optional<E>.empty())
-          .asOptional<E>()
-          .mapWhereOptional());
+      Transaction.runRequired((transaction) => snapshot<bool, E?>(
+              conditionState, (event, condition) => condition ? event : null)
+          .mapWhereNotNull());
 
   EventStream<E> orElse(EventStream<E> stream) => merges<E>([this, stream]);
 
@@ -334,7 +305,7 @@ class EventStream<E> extends FrappeObject<E> {
       });
 
   ListenSubscription listenOnce(ValueHandler<E> onEvent) {
-    ListenSubscription listenSubscription;
+    late final ListenSubscription listenSubscription;
 
     listenSubscription = listen((data) {
       listenSubscription.cancel();
@@ -359,31 +330,6 @@ class EventStream<E> extends FrappeObject<E> {
       }
     });
   }
-}
-
-class OptionalEventStream<E> extends EventStream<Optional<E>> {
-  OptionalEventStream.never() : super.never();
-
-  OptionalEventStream._(Node<Optional<E>> node) : super._(node);
-
-  @override
-  FrappeReference<OptionalEventStream<E>> toReference() =>
-      FrappeReference(this);
-
-  @override
-  OptionalValueState<E> toState(Optional<E> initValue) =>
-      super.toState(initValue).asOptional<E>();
-
-  @override
-  OptionalEventStream<EE> asOptional<EE>() =>
-      throw StateError('Already optional');
-
-  EventStream<bool> mapIsEmptyOptional() => map((event) => !event.isPresent);
-
-  EventStream<bool> mapIsPresentOptional() => map((event) => event.isPresent);
-
-  EventStream<E> mapWhereOptional() =>
-      where((event) => event.isPresent).map((event) => event.value);
 }
 
 class _ReferenceListenSubscription extends ListenSubscription {

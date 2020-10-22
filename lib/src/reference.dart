@@ -1,5 +1,4 @@
-import 'package:frappe/frappe.dart';
-import 'package:meta/meta.dart';
+import 'package:frappe/src/disposable.dart';
 
 class ReferenceGroup implements Disposable {
   final Set<Reference> _references = Set.identity();
@@ -9,7 +8,7 @@ class ReferenceGroup implements Disposable {
   Reference<R> reference<R extends Referenceable>(R referenceable) =>
       add(Reference(referenceable));
 
-  Reference<R> add<R extends Referenceable>(Reference<R> reference) {
+  R add<R extends Reference>(R reference) {
     _checkDisposed();
 
     _references.add(reference);
@@ -98,7 +97,7 @@ class Reference<R extends Referenceable> implements Disposable {
   }
 
   void _unregisterReference() {
-    final references = _globalReferences[value];
+    final references = _globalReferences[value]!;
     references.remove(this);
     if (references.isEmpty) {
       _globalReferences.remove(value);
@@ -145,7 +144,7 @@ abstract class Referenceable {
     return _hostedGroup.add(HostedReference(this, value));
   }
 
-  @protected
+  // @protected
   void onUnreferenced() {
     if (!_hostedGroup.isDisposed) {
       _hostedGroup.dispose();
@@ -166,7 +165,7 @@ abstract class Referenceable {
     }
   }
 
-  bool _checkReferenced(Referenceable referenceable, [Set<Reference> visited]) {
+  bool _checkReferenced(Referenceable referenceable, Set<Reference> visited) {
     final references = Reference._globalReferences[referenceable];
     if (references != null && references.isNotEmpty) {
       for (final reference in references) {

@@ -1,4 +1,4 @@
-import 'package:tuple/tuple.dart';
+import 'package:frappe/src/tuple.dart';
 
 typedef Runner<T> = T Function();
 typedef Accumulator<V, S> = S Function(V value, S state);

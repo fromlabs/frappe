@@ -1,10 +1,9 @@
-import '../reference.dart';
-
-import 'node_evaluation_collection.dart';
-import 'node_evaluation_list.dart';
-import 'node_evaluation_map.dart';
-import 'node_evaluation.dart';
-import 'transaction.dart';
+import 'package:frappe/src/node/node_evaluation.dart';
+import 'package:frappe/src/node/node_evaluation_collection.dart';
+import 'package:frappe/src/node/node_evaluation_list.dart';
+import 'package:frappe/src/node/node_evaluation_map.dart';
+import 'package:frappe/src/node/transaction.dart';
+import 'package:frappe/src/reference.dart';
 
 typedef ValueHandler<V> = void Function(V value);
 typedef NodeEvaluator<V> = NodeEvaluation<V> Function(
@@ -45,17 +44,17 @@ abstract class Node<S> extends Referenceable {
 
   EvaluationType _evaluationType;
 
-  int _evaluationPriority;
+  late int _evaluationPriority;
 
-  ValueHandler<S> commitHandler;
+  late ValueHandler<S> commitHandler;
 
-  ValueHandler<S> publishHandler;
+  late ValueHandler<S> publishHandler;
 
   Node({
-    String debugLabel,
-    EvaluationType evaluationType,
-    ValueHandler<S> commitHandler,
-    ValueHandler<S> publishHandler,
+    String? debugLabel,
+    required EvaluationType evaluationType,
+    ValueHandler<S>? commitHandler,
+    ValueHandler<S>? publishHandler,
   })  : id = _nodeId++,
         debugLabel = '${debugLabel ?? 'node'}:$_nodeId',
         _evaluationType = evaluationType {
@@ -84,7 +83,7 @@ abstract class Node<S> extends Referenceable {
   bool get isLinked => sourceReferences.isNotEmpty;
 
   NodeEvaluationCollection createEvaluationInputs(
-      Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries);
+      Iterable<MapEntry<dynamic, NodeEvaluation?>> inputEntries);
 
   @override
   void onUnreferenced() {
@@ -180,18 +179,23 @@ class IndexNode<S> extends Node<S> {
   final IndexNodeEvaluator<S> _evaluateHandler;
 
   IndexNode({
-    String debugLabel,
+    String? debugLabel,
     EvaluationType evaluationType = EvaluationType.allInputs,
-    IndexNodeEvaluator<S> evaluateHandler,
-    ValueHandler<S> commitHandler,
-    ValueHandler<S> publishHandler,
-  })  : _evaluateHandler = evaluateHandler,
+    IndexNodeEvaluator<S>? evaluateHandler,
+    ValueHandler<S>? commitHandler,
+    ValueHandler<S>? publishHandler,
+  })  : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler,
         super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
         );
+
+  static NodeEvaluation<S> _missingEvaluateHandler<S>(
+      NodeEvaluationList inputs) {
+    throw UnsupportedError('Missing evaluation handler');
+  }
 
   void link(Iterable<Node> sources) {
     if (isLinked) {
@@ -220,10 +224,11 @@ class IndexNode<S> extends Node<S> {
 
   @override
   NodeEvaluationList createEvaluationInputs(
-          Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries) =>
-      NodeEvaluationList(inputEntries.map((entry) => entry.value != null
-          ? entry
-          : MapEntry(entry.key, NodeEvaluation<S>.not())));
+          Iterable<MapEntry<dynamic, NodeEvaluation?>> inputEntries) =>
+      NodeEvaluationList(inputEntries.map((entry) =>
+          entry is MapEntry<dynamic, NodeEvaluation>
+              ? entry
+              : MapEntry(entry.key, NodeEvaluation<S>.not())));
 
   @override
   NodeEvaluation<S> evaluate(NodeEvaluationList inputs) =>
@@ -234,18 +239,23 @@ class KeyNode<S> extends Node<S> {
   final KeyNodeEvaluator<S> _evaluateHandler;
 
   KeyNode({
-    String debugLabel,
+    String? debugLabel,
     EvaluationType evaluationType = EvaluationType.allInputs,
-    KeyNodeEvaluator<S> evaluateHandler,
-    ValueHandler<S> commitHandler,
-    ValueHandler<S> publishHandler,
-  })  : _evaluateHandler = evaluateHandler,
+    KeyNodeEvaluator<S>? evaluateHandler,
+    ValueHandler<S>? commitHandler,
+    ValueHandler<S>? publishHandler,
+  })  : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler,
         super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
         );
+
+  static NodeEvaluation<S> _missingEvaluateHandler<S>(
+      NodeEvaluationMap inputs) {
+    throw UnsupportedError('Missing evaluation handler');
+  }
 
   bool isLinkedKey({key}) =>
       sourceReferences.containsKey(key ?? defaultEvaluationKey);
@@ -273,10 +283,11 @@ class KeyNode<S> extends Node<S> {
 
   @override
   NodeEvaluationMap createEvaluationInputs(
-          Iterable<MapEntry<dynamic, NodeEvaluation>> inputEntries) =>
-      NodeEvaluationMap(inputEntries.map((entry) => entry.value != null
-          ? entry
-          : MapEntry(entry.key, NodeEvaluation<S>.not())));
+          Iterable<MapEntry<dynamic, NodeEvaluation?>> inputEntries) =>
+      NodeEvaluationMap(inputEntries.map((entry) =>
+          entry is MapEntry<dynamic, NodeEvaluation>
+              ? entry
+              : MapEntry(entry.key, NodeEvaluation<S>.not())));
 
   @override
   NodeEvaluation<S> evaluate(NodeEvaluationMap inputs) =>

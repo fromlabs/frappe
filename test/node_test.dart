@@ -18,8 +18,8 @@ void main() {
   });
 
   test('Node test 1', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -41,9 +41,9 @@ void main() {
   });
 
   test('Node test 2', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    KeyNode<int> node3;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
+    late final KeyNode<int> node3;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -56,9 +56,9 @@ void main() {
   });
 
   test('Node test 3', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    KeyNode<int> node3;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
+    late final KeyNode<int> node3;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -73,8 +73,8 @@ void main() {
   });
 
   test('Node test 4', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -87,7 +87,7 @@ void main() {
   test('Node test 4b', () {
     final node1 = Transaction.run((_) => KeyNode<int>(debugLabel: 'N1'));
 
-    KeyNode<int> node2;
+    late final KeyNode<int> node2;
 
     Transaction.run((tx) {
       node2 = KeyNode<int>(debugLabel: 'N2');
@@ -97,7 +97,7 @@ void main() {
   });
 
   test('Node test 4c', () {
-    KeyNode<int> node1;
+    late final KeyNode<int> node1;
 
     final node2 = Transaction.run((_) => KeyNode<int>(debugLabel: 'N2'));
 
@@ -109,10 +109,10 @@ void main() {
   });
 
   test('Node test 5', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    KeyNode<int> node3;
-    Reference<KeyNode<int>> node3Ref;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
+    late final KeyNode<int> node3;
+    late final Reference<KeyNode<int>> node3Ref;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -145,9 +145,9 @@ void main() {
   });
 
   test('Node test 6', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    Reference<KeyNode<int>> node2Ref;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
+    late final Reference<KeyNode<int>> node2Ref;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -161,9 +161,9 @@ void main() {
   });
 
   test('Node test 7', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    Reference<KeyNode<int>> node2Ref;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
+    late final Reference<KeyNode<int>> node2Ref;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -177,9 +177,9 @@ void main() {
   });
 
   test('Node test 8', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    Reference<KeyNode<int>> node2Ref;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
+    late final Reference<KeyNode<int>> node2Ref;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -196,7 +196,7 @@ void main() {
     expect(node1.isReferenced, true);
     expect(node2.isReferenced, true);
 
-    Reference<KeyNode<int>> node2bRef;
+    late final Reference<KeyNode<int>> node2bRef;
     Transaction.run((tx) {
       expect(node1.isReferenced, true);
       expect(node2.isReferenced, true);
@@ -224,10 +224,10 @@ void main() {
   });
 
   test('Node test 9', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    KeyNode<int> node3;
-    Reference<KeyNode<int>> node3Ref;
+    late final KeyNode<int> node1;
+    late final KeyNode<int> node2;
+    late final KeyNode<int> node3;
+    late final Reference<KeyNode<int>> node3Ref;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -276,15 +276,15 @@ void main() {
   });
 
   test('Node evaluation test 1', () {
-    Reference<KeyNode<int>> node1Ref;
-    Reference<KeyNode<int>> node2Ref;
+    late final Reference<KeyNode<int>> node1Ref;
+    late final Reference<KeyNode<int>> node2Ref;
 
     Transaction.run((tx) {
       final node1 = KeyNode<int>(debugLabel: 'INPUT');
       final node2 = KeyNode<int>(
           debugLabel: 'DUPLIFY',
           evaluateHandler: (inputs) =>
-              NodeEvaluation(2 * inputs.evaluation.value));
+              NodeEvaluation(2 * inputs.evaluation.value as int));
 
       node2.link(node1);
 
@@ -301,11 +301,11 @@ void main() {
   });
 
   test('Node evaluation test 2', () {
-    Reference<KeyNode<int>> input1Ref;
-    Reference<KeyNode<int>> input2Ref;
-    Reference<KeyNode<int>> input3Ref;
-    Reference<KeyNode<int>> merge1Ref;
-    Reference<KeyNode<int>> listenRef;
+    late final Reference<KeyNode<int>> input1Ref;
+    late final Reference<KeyNode<int>> input2Ref;
+    late final Reference<KeyNode<int>> input3Ref;
+    late final Reference<KeyNode<int>> merge1Ref;
+    late final Reference<KeyNode<int>> listenRef;
 
     final commits = Queue<int>();
     final publishs = Queue<int>();
@@ -318,20 +318,21 @@ void main() {
       final node21 = KeyNode<int>(
           debugLabel: 'DUPLIFY1',
           evaluateHandler: (inputs) =>
-              NodeEvaluation(2 * inputs.evaluation.value))
+              NodeEvaluation(2 * inputs.evaluation.value as int))
         ..link(input1);
 
       final node22 = KeyNode<int>(
           debugLabel: 'TRIPLIFY2',
           evaluateHandler: (inputs) =>
-              NodeEvaluation(3 * inputs.evaluation.value))
+              NodeEvaluation(3 * inputs.evaluation.value as int))
         ..link(input2);
 
       final merge2 = KeyNode<int>(
         debugLabel: 'MERGE2',
         evaluationType: EvaluationType.almostOneInput,
-        evaluateHandler: (inputs) =>
-            inputs[0].isEvaluated ? inputs[0] : inputs[1],
+        evaluateHandler: (inputs) => (inputs[0].isEvaluated
+            ? inputs[0]
+            : inputs[1]) as NodeEvaluation<int>,
       )
         ..link(input3, key: 0)
         ..link(node22, key: 1);
@@ -339,7 +340,7 @@ void main() {
       final node32 = KeyNode<int>(
           debugLabel: 'TRIPLIFY3',
           evaluateHandler: (inputs) =>
-              NodeEvaluation(3 * inputs.evaluation.value))
+              NodeEvaluation(3 * inputs.evaluation.value as int))
         ..link(merge2);
 
       // ignore: unused_local_variable
@@ -347,8 +348,9 @@ void main() {
       final merge1 = KeyNode<int>(
         debugLabel: 'MERGE1',
         evaluationType: EvaluationType.almostOneInput,
-        evaluateHandler: (inputs) =>
-            inputs[0].isEvaluated ? inputs[0] : inputs[1],
+        evaluateHandler: (inputs) => (inputs[0].isEvaluated
+            ? inputs[0]
+            : inputs[1]) as NodeEvaluation<int>,
         commitHandler: (value) => merge1Value = value,
       )
         ..link(node32, key: 0)
@@ -357,16 +359,16 @@ void main() {
       var previousEvaluation = NodeEvaluation.not();
       final distinct = KeyNode<int>(
         debugLabel: 'DISTINCT',
-        evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
+        evaluateHandler: (inputs) => (previousEvaluation.isNotEvaluated ||
                 inputs.evaluation.value != previousEvaluation.value
             ? inputs.evaluation
-            : NodeEvaluation.not(),
+            : NodeEvaluation.not()) as NodeEvaluation<int>,
         commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
       )..link(merge1);
 
       final listen = KeyNode<int>(
         debugLabel: 'LISTEN',
-        evaluateHandler: (inputs) => inputs.evaluation,
+        evaluateHandler: (inputs) => inputs.evaluation as NodeEvaluation<int>,
         commitHandler: commits.add,
         publishHandler: publishs.add,
       )..link(distinct);
