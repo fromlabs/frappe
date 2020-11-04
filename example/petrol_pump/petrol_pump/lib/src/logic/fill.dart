@@ -11,13 +11,9 @@ ValueState<double> _capturePrice(
     ValueState<double> price2State,
     ValueState<double> price3State) {
   final price1Stream = startStream
-      .snapshot(
-          price1State,
-          (startFuel, price) => startFuel == Fuel.one
-              ? Optional<double>.of(price)
-              : Optional<double>.empty())
-      .asOptional<double>()
-      .mapWhereOptional();
+      .snapshot<double, double?>(price1State,
+          (startFuel, price) => startFuel == Fuel.one ? price : null)
+      .whereType<double>();
 
   final price2Stream = startStream
       .snapshot(

@@ -13,12 +13,15 @@ abstract class NodeEvaluation<S> {
 }
 
 class _NodeEvaluation<S> implements NodeEvaluation<S> {
+  @override
   final S value;
 
+  @override
   final bool isEvaluated = true;
 
   _NodeEvaluation(this.value);
 
+  @override
   bool get isNotEvaluated => !isEvaluated;
 
   @override
@@ -38,12 +41,15 @@ class _NodeEvaluation<S> implements NodeEvaluation<S> {
 }
 
 class _NotNodeEvaluation<S> implements NodeEvaluation<S> {
+  @override
   final bool isEvaluated = false;
 
   const _NotNodeEvaluation();
 
+  @override
   bool get isNotEvaluated => !isEvaluated;
 
+  @override
   S get value => throw StateError('Not evaluated');
 
   @override

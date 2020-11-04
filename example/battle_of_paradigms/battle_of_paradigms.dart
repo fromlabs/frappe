@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:frappe/frappe.dart';
-import 'package:optional/optional.dart';
 
 class Point {
   final int x;
@@ -34,7 +33,7 @@ class Entry {
 }
 
 abstract class Document {
-  Optional<Entry> getByPoint(Point point);
+  Entry? getByPoint(Point point);
 
   Document insert(String id, Element polygon);
 }
@@ -46,12 +45,12 @@ abstract class DocumentListener {
 abstract class Paradigm {
   void mouseEvent(MouseEvent event);
 
-  Future<void> dispose();
+  FutureOr<void> dispose();
 }
 
 class FrpParadigm implements Paradigm {
   final EventStreamSink<MouseEvent> mouseEventStreamSink = EventStreamSink();
-  ListenSubscription documentUpdateSubscription;
+  ListenSubscription? documentUpdateSubscription;
 
   FrpParadigm(Document initDocument, DocumentListener documentListener) {
     // TODO sistemare ValueStateReference(initDocument);
@@ -61,19 +60,21 @@ class FrpParadigm implements Paradigm {
 
     final startDragStream = mouseEventStreamSink.stream
         .where((event) => event.type == MouseEventType.DOWN)
-        .snapshot<Document, Optional<EventStream<Document>>>(
-            documentStateReference.state,
-            (startEvent, document) => document.getByPoint(startEvent.point).map(
-                (entry) => mouseEventStreamSink.stream
-                    .where((event) => event.type == MouseEventType.MOVE)
-                    .snapshot<Document, Document>(
-                        documentStateReference.state,
-                        (dragEvent, document) => document.insert(
-                            entry.id,
-                            entry.element.translate(
-                                startEvent.point, dragEvent.point)))))
-        .asOptional<EventStream<Document>>()
-        .mapWhereOptional();
+        .snapshot<Document, EventStream<Document>?>(
+            documentStateReference.state, (startEvent, document) {
+      final entry = document.getByPoint(startEvent.point);
+
+      return entry != null
+          ? mouseEventStreamSink.stream
+              .where((event) => event.type == MouseEventType.MOVE)
+              .snapshot<Document, Document>(
+                  documentStateReference.state,
+                  (dragEvent, document) => document.insert(
+                      entry.id,
+                      entry.element
+                          .translate(startEvent.point, dragEvent.point)))
+          : null;
+    }).whereType<EventStream<Document>>();
 
     final endDragStream = mouseEventStreamSink.stream
         .where((event) => event.type == MouseEventType.UP)
@@ -90,9 +91,9 @@ class FrpParadigm implements Paradigm {
   void mouseEvent(MouseEvent event) => mouseEventStreamSink.send(event);
 
   @override
-  Future<void> dispose() async {
-    await documentUpdateSubscription.cancel();
+  void dispose() {
+    documentUpdateSubscription?.cancel();
 
-    await mouseEventStreamSink.close();
+    mouseEventStreamSink.close();
   }
 }

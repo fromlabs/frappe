@@ -2,6 +2,15 @@ import 'dart:async';
 
 import 'package:frappe/src/disposable.dart';
 
+extension StreamSubscriptionDisposeSupport on StreamSubscription {
+  StreamSubscriptionDisposable toDisposable() =>
+      StreamSubscriptionDisposable(this);
+}
+
+extension StreamControllerDisposeSupport on StreamController {
+  StreamControllerDisposable toDisposable() => StreamControllerDisposable(this);
+}
+
 class StreamSubscriptionDisposable implements Disposable {
   final StreamSubscription _streamSubscription;
 

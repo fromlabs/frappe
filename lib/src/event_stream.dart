@@ -1,9 +1,7 @@
 import 'package:frappe/src/frappe_object.dart';
-import 'package:frappe/src/frappe_reference.dart';
 import 'package:frappe/src/lazy_value.dart';
 import 'package:frappe/src/listen_subscription.dart';
 import 'package:frappe/src/node.dart';
-import 'package:frappe/src/node/node.dart';
 import 'package:frappe/src/reference.dart';
 import 'package:frappe/src/typedef.dart';
 import 'package:frappe/src/value_state.dart';
@@ -154,10 +152,7 @@ class EventStream<E> extends FrappeObject<E> {
 
   bool get isUnreferenced => !isReferenced;
 
-  @override
-  FrappeReference<EventStream<E>> toReference() => FrappeReference(this);
-
-  ValueState<E> toState(E initValue) => toStateLazy(LazyValue(initValue));
+  ValueState<E> toState(E initValue) => toStateLazy(LazyValue.value(initValue));
 
   ValueState<E> toStateLazy(LazyValue<E> lazyInitValue) =>
       Transaction.runRequired((_) => createValueState(lazyInitValue, this));

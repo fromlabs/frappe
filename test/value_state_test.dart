@@ -1,7 +1,6 @@
 import 'dart:collection';
 
 import 'package:frappe/frappe.dart';
-import 'package:optional/optional_internal.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -75,7 +74,7 @@ void main() {
       final sink = ValueStateSink<int>(-1);
 
       final events1 = Queue<int>();
-      ListenSubscription subscription1;
+      late final ListenSubscription subscription1;
       runTransaction(() {
         sink.send(0);
 
@@ -160,42 +159,40 @@ void main() {
     test('Test 07', () {
       final sink = ValueStateSink<int>(0);
 
-      final events1 = Queue<Optional<int>>();
+      final events1 = Queue<int?>();
 
       final subscription1 = runTransaction(() => sink.state
-              .map<Optional<int>>((value) =>
-                  value.isEven ? Optional.of(value) : Optional.empty())
-              .asOptional()
+              .map<int?>((value) => value.isEven ? value : null)
               .listen((event) {
             events1.addLast(event);
           }));
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.of(0)));
+      expect(events1.removeLast(), equals(0));
       expect(events1, isEmpty);
 
       sink.send(1);
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.empty()));
+      expect(events1.removeLast(), isNull);
       expect(events1, isEmpty);
 
       sink.send(4);
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.of(4)));
+      expect(events1.removeLast(), equals(4));
       expect(events1, isEmpty);
 
       sink.send(6);
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.of(6)));
+      expect(events1.removeLast(), equals(6));
       expect(events1, isEmpty);
 
       sink.send(7);
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.empty()));
+      expect(events1.removeLast(), isNull);
       expect(events1, isEmpty);
 
       subscription1.cancel();
@@ -284,8 +281,9 @@ void main() {
 
       final events1 = Queue<int>();
 
-      final subscription1 = runTransaction(() =>
-          sink1.state.combine(sink2.state, (v1, v2) => v1 + v2).listen((event) {
+      final subscription1 = runTransaction(() => sink1.state
+              .combine<int, int>(sink2.state, (v1, v2) => v1 + v2)
+              .listen((event) {
             events1.addLast(event);
           }));
 
@@ -405,8 +403,9 @@ void main() {
 
       final events1 = Queue<int>();
 
-      final subscription1 = runTransaction(() =>
-          sink1.state.combine(sink2.state, (v1, v2) => v1 + v2).listen((event) {
+      final subscription1 = runTransaction(() => sink1.state
+              .combine<int, int>(sink2.state, (v1, v2) => v1 + v2)
+              .listen((event) {
             events1.addLast(event);
           }));
 
@@ -442,18 +441,17 @@ void main() {
 
   group('OptionalValueState 02', () {
     test('Test 01', () {
-      runTransaction(() => OptionalValueState<int>.constantOf(1));
+      runTransaction(() => ValueState<int?>.constant(1));
     });
 
     test('Test 10', () {
-      final sink1 = OptionalValueStateSink<int>.of(1);
-      final sink2 = OptionalValueStateSink<int>.of(2);
+      final sink1 = ValueStateSink<int>(1);
+      final sink2 = ValueStateSink<int>(2);
 
       final events1 = Queue<int>();
 
       final subscription1 = runTransaction(() => sink1.state
-              .combine<Optional<int>, int>(
-                  sink2.state, (v1, v2) => v1.value + v2.value)
+              .combine<int, int>(sink2.state, (v1, v2) => v1 + v2)
               .listen((event) {
             events1.addLast(event);
           }));
@@ -462,21 +460,21 @@ void main() {
       expect(events1.removeLast(), equals(3));
       expect(events1, isEmpty);
 
-      sink1.sendOptionalOf(2);
+      sink1.send(2);
 
       expect(events1, isNotEmpty);
       expect(events1.removeLast(), equals(4));
       expect(events1, isEmpty);
 
-      sink2.sendOptionalOf(3);
+      sink2.send(3);
 
       expect(events1, isNotEmpty);
       expect(events1.removeLast(), equals(5));
       expect(events1, isEmpty);
 
       runTransaction(() {
-        sink1.sendOptionalOf(4);
-        sink2.sendOptionalOf(5);
+        sink1.send(4);
+        sink2.send(5);
       });
 
       expect(events1, isNotEmpty);
@@ -490,10 +488,10 @@ void main() {
     });
 
     test('Test 12', () {
-      final sink = runTransaction(() => ValueStateSink<OptionalValueState<int>>(
-          OptionalValueState.constantOf(0)));
+      final sink = runTransaction(
+          () => ValueStateSink<ValueState<int?>>(ValueState.constant(0)));
 
-      final events1 = Queue<Optional<int>>();
+      final events1 = Queue<int?>();
 
       final subscription1 = runTransaction(
           () => ValueState.switchState(sink.state).listen((event) {
@@ -501,7 +499,7 @@ void main() {
               }));
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.of(0)));
+      expect(events1.removeLast(), equals(0));
       expect(events1, isEmpty);
 
       subscription1.cancel();
@@ -568,55 +566,54 @@ void main() {
 
   group('OptionalValueStateSink 04', () {
     test('Test 01', () {
-      final sink = OptionalValueStateSink<int>.of(1);
+      final sink = ValueStateSink<int?>(1);
 
       expect(sink.isClosed, isFalse);
 
-      sink.send(Optional.of(1));
+      sink.send(1);
 
       sink.close();
 
       expect(sink.isClosed, isTrue);
 
-      expect(() => sink.send(Optional.of(1)), throwsStateError);
+      expect(() => sink.send(1), throwsStateError);
     });
 
     test('Test 02', () {
-      final sink = OptionalValueStateSink<int>.of(1);
+      final sink = ValueStateSink<int?>(1);
 
-      sink.send(Optional.of(1));
+      sink.send(1);
 
-      sink.send(Optional.of(2));
+      sink.send(2);
 
       runTransaction(() {
-        sink.send(Optional.of(3));
+        sink.send(3);
       });
 
       runTransaction(() {
-        sink.send(Optional.of(4));
+        sink.send(4);
 
-        expect(() => sink.send(Optional.of(5)), throwsUnsupportedError);
+        expect(() => sink.send(5), throwsUnsupportedError);
       });
 
       sink.close();
     });
 
     test('Test 03', () {
-      final sink =
-          OptionalValueStateSink<int>.empty((newValue, oldValue) => newValue);
+      final sink = ValueStateSink<int?>(null, (newValue, oldValue) => newValue);
 
-      sink.send(Optional.of(1));
+      sink.send(1);
 
-      sink.send(Optional.of(2));
+      sink.send(2);
 
       runTransaction(() {
-        sink.send(Optional.of(3));
+        sink.send(3);
       });
 
       runTransaction(() {
-        sink.send(Optional.of(4));
+        sink.send(4);
 
-        sink.send(Optional.of(5));
+        sink.send(5);
       });
 
       sink.close();

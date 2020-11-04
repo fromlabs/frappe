@@ -1,16 +1,14 @@
 name: frappe
 description: A starting point for Dart libraries or applications.
-version: 0.3.0
+version: 0.4.0
 homepage: https://github.com/fromlabs/frappe
 author: Roberto Tassi <roberto.tassi@fromlabs.org>
 
 environment:
-  sdk: '>=2.11.0-218.0.dev <3.0.0'
+  sdk: '>=2.11.0-213.0.dev <3.0.0'
 
 dependencies:
-  #pedantic: ^1.10.0-nullsafety.1
-  #optional: ^5.0.0
-  #tuple: ^1.0.3
+  pedantic: ^1.10.0-nullsafety.2
 
 dev_dependencies:
-  # test: any
+  test: ^1.16.0-nullsafety.8

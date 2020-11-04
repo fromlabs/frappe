@@ -79,8 +79,8 @@ void main() {
     test('Test 05', () {
       final sink = EventStreamSink<int>();
 
-      ListenSubscription subscription1;
-      ListenSubscription subscription2;
+      late final ListenSubscription subscription1;
+      late final ListenSubscription subscription2;
 
       final events1 = Queue<int>();
       final events2 = Queue<int>();
@@ -253,12 +253,10 @@ void main() {
     test('Test 10', () {
       final sink = EventStreamSink<int>();
 
-      final events1 = Queue<Optional<int>>();
+      final events1 = Queue<int?>();
 
       final subscription1 = runTransaction(() => sink.stream
-              .map<Optional<int>>((value) =>
-                  value.isEven ? Optional.of(value) : Optional.empty())
-              .asOptional()
+              .map<int?>((value) => value.isEven ? value : null)
               .listen((event) {
             events1.addLast(event);
           }));
@@ -268,25 +266,25 @@ void main() {
       sink.send(1);
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.empty()));
+      expect(events1.removeLast(), isNull);
       expect(events1, isEmpty);
 
       sink.send(4);
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.of(4)));
+      expect(events1.removeLast(), equals(4));
       expect(events1, isEmpty);
 
       sink.send(6);
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.of(6)));
+      expect(events1.removeLast(), equals(6));
       expect(events1, isEmpty);
 
       sink.send(7);
 
       expect(events1, isNotEmpty);
-      expect(events1.removeLast(), equals(Optional.empty()));
+      expect(events1.removeLast(), isNull);
       expect(events1, isEmpty);
 
       subscription1.cancel();
@@ -525,8 +523,8 @@ void main() {
     test('Test 17', () {
       final events1 = Queue<int>();
 
-      EventStreamSink<int> sink;
-      FrappeReference<EventStream<int>> streamReference;
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
 
       runTransaction(() {
         sink = EventStreamSink<int>();
@@ -562,7 +560,7 @@ void main() {
 
   group('OptionalEventStream', () {
     test('Test 01', () {
-      runTransaction(() => OptionalEventStream<int>.never());
+      runTransaction(() => EventStream<int?>.never());
     });
   });
 
@@ -624,55 +622,54 @@ void main() {
 
   group('OptionalEventStreamSink', () {
     test('Test 01', () {
-      final sink = OptionalEventStreamSink<int>();
+      final sink = EventStreamSink<int?>();
 
       expect(sink.isClosed, isFalse);
 
-      sink.send(Optional.of(1));
+      sink.send(1);
 
       sink.close();
 
       expect(sink.isClosed, isTrue);
 
-      expect(() => sink.send(Optional.of(1)), throwsStateError);
+      expect(() => sink.send(1), throwsStateError);
     });
 
     test('Test 02', () {
-      final sink = OptionalEventStreamSink<int>();
+      final sink = EventStreamSink<int?>();
 
-      sink.send(Optional.of(1));
+      sink.send(1);
 
-      sink.send(Optional.of(2));
+      sink.send(2);
 
       runTransaction(() {
-        sink.send(Optional.of(3));
+        sink.send(3);
       });
 
       runTransaction(() {
-        sink.send(Optional.of(4));
+        sink.send(4);
 
-        expect(() => sink.send(Optional.of(5)), throwsUnsupportedError);
+        expect(() => sink.send(5), throwsUnsupportedError);
       });
 
       sink.close();
     });
 
     test('Test 03', () {
-      final sink =
-          OptionalEventStreamSink<int>((newValue, oldValue) => newValue);
+      final sink = EventStreamSink<int?>((newValue, oldValue) => newValue);
 
-      sink.send(Optional.of(1));
+      sink.send(1);
 
-      sink.send(Optional.of(2));
+      sink.send(2);
 
       runTransaction(() {
-        sink.send(Optional.of(3));
+        sink.send(3);
       });
 
       runTransaction(() {
-        sink.send(Optional.of(4));
+        sink.send(4);
 
-        sink.send(Optional.of(5));
+        sink.send(5);
       });
 
       final ref = sink.stream.toReference();
@@ -682,6 +679,7 @@ void main() {
       sink.close();
     });
   });
+
 /*
   group('EventStreamReference', () {
     test('Test 1', () {

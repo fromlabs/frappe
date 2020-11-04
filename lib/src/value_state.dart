@@ -1,6 +1,5 @@
 import 'package:frappe/src/event_stream.dart';
 import 'package:frappe/src/frappe_object.dart';
-import 'package:frappe/src/frappe_reference.dart';
 import 'package:frappe/src/lazy_value.dart';
 import 'package:frappe/src/listen_subscription.dart';
 import 'package:frappe/src/node.dart';
@@ -9,6 +8,16 @@ import 'package:frappe/src/typedef.dart';
 
 extension ExtendedValueState<V> on ValueState<V> {
   Node<V> get node => _node;
+}
+
+extension NullableValueStateSink<V> on ValueStateSink<V?> {
+  void sendNull() => send(null);
+}
+
+extension NullableValueState<V> on ValueState<V?> {
+  ValueState<bool> mapIsNull() => map((value) => value == null);
+
+  ValueState<bool> mapIsNotNull() => map((value) => value != null);
 }
 
 ValueState<V> createValueState<V>(
@@ -24,7 +33,7 @@ class ValueStateSink<V> {
   final EventStreamSink<V> _eventStreamSink;
 
   factory ValueStateSink(V initValue, [Merger<V>? merger]) =>
-      ValueStateSink.lazy(LazyValue(initValue), merger);
+      ValueStateSink.lazy(LazyValue.value(initValue), merger);
 
   factory ValueStateSink.lazy(LazyValue<V> lazyInitValue,
           [Merger<V>? merger]) =>
@@ -45,41 +54,6 @@ class ValueStateSink<V> {
   void send(V value) => _eventStreamSink.send(value);
 }
 
-/*
-class OptionalValueStateSink<V> extends ValueStateSink<Optional<V>> {
-  factory OptionalValueStateSink(Optional<V> initValue,
-          [Merger<Optional<V>> merger]) =>
-      OptionalValueStateSink.lazy(LazyValue(initValue), merger);
-
-  factory OptionalValueStateSink.empty([Merger<Optional<V>> merger]) =>
-      OptionalValueStateSink(Optional.empty(), merger);
-
-  factory OptionalValueStateSink.of(V initValue,
-          [Merger<Optional<V>> merger]) =>
-      OptionalValueStateSink(Optional.of(initValue), merger);
-
-  factory OptionalValueStateSink.lazy(LazyValue<Optional<V>> lazyInitValue,
-          [Merger<Optional<V>> merger]) =>
-      Transaction.run((_) {
-        final eventStreamSink = OptionalEventStreamSink<V>(merger);
-
-        return OptionalValueStateSink<V>._(
-            OptionalValueState._(lazyInitValue, eventStreamSink.stream),
-            eventStreamSink);
-      });
-
-  OptionalValueStateSink._(
-      OptionalValueState<V> state, OptionalEventStreamSink<V> eventStreamSink)
-      : super._(state, eventStreamSink);
-
-  @override
-  OptionalValueState<V> get state => super.state;
-
-  void sendOptionalEmpty() => send(Optional<V>.empty());
-
-  void sendOptionalOf(V value) => send(Optional<V>.of(value));
-}
-*/
 class ValueStateLink<V> {
   final ValueState<V> state;
   late final LazyValue<V> _connectedLazyValue;
@@ -115,40 +89,15 @@ class ValueStateLink<V> {
   KeyNode<V> get _node => state._node as KeyNode<V>;
 }
 
-/*
-class OptionalValueStateLink<V> extends ValueStateLink<Optional<V>> {
-  factory OptionalValueStateLink() {
-    OptionalValueStateLink<V> link;
-
-    link = Transaction.runRequired((transaction) => OptionalValueStateLink._(
-        OptionalValueState<V>._(
-            LazyValue<Optional<V>>.provide(() => link.isConnected
-                ? link._connectedLazyValue.get()
-                : throw StateError('Link is not connected')),
-            createOptionalEventStream(KeyNode<Optional<V>>(
-                evaluateHandler: _defaultEvaluateHandler)))));
-
-    return link;
-  }
-
-  OptionalValueStateLink._(OptionalValueState<V> state) : super._(state);
-
-  @override
-  OptionalValueState<V> get state => super.state;
-
-  @override
-  void connect(covariant OptionalValueState<V> state) => super.connect(state);
-}
-*/
 class ValueState<V> extends FrappeObject<V> {
   final EventStream<V> _stream;
 
-  late final LazyValue<V> _currentLazyValue;
+  late LazyValue<V> _currentLazyValue;
 
   Reference? _currentValueReference;
 
   ValueState.constant(V initValue)
-      : this._(LazyValue(initValue), EventStream<V>.never());
+      : this._(LazyValue.value(initValue), EventStream<V>.never());
 
   ValueState._(LazyValue<V> lazyInitValue, this._stream)
       : _currentLazyValue = lazyInitValue {
@@ -163,7 +112,7 @@ class ValueState<V> extends FrappeObject<V> {
 
       if (!_currentLazyValue.hasValue ||
           !identical(value, _currentLazyValue.get())) {
-        _currentLazyValue = LazyValue(value);
+        _currentLazyValue = LazyValue.value(value);
         _updateCurrentValueReference(value);
       }
     };
@@ -239,14 +188,6 @@ class ValueState<V> extends FrappeObject<V> {
 
   LazyValue<V> getLazyValue() => _currentLazyValue;
 
-/*
-  OptionalValueState<VV> asOptional<VV>() =>
-      Transaction.runRequired((_) => OptionalValueState._(
-          getLazyValue()._castOptional<VV>(), _stream.asOptional()));
-*/
-  @override
-  FrappeReference<ValueState<V>> toReference() => FrappeReference(this);
-
   EventStream<V> toValues() => Transaction.runRequired((transaction) {
         final targetNode = KeyNode<V>(
             evaluationType: EvaluationType.always,
@@ -275,10 +216,6 @@ class ValueState<V> extends FrappeObject<V> {
   ValueState<VR> map<VR>(Mapper<V, VR> mapper) => Transaction.runRequired(
       (_) => ValueState._(_currentLazyValue.map(mapper), _stream.map(mapper)));
 
-/*
-  OptionalValueState<V> mapToOptionalOf() => runTransaction(
-      () => map<Optional<V>>((value) => Optional<V>.of(value)).asOptional<V>());
-*/
   ValueState<VR> combine<V2, VR>(
           ValueState<V2> state2, Combiner2<V, V2, VR> combiner) =>
       combines<VR>([this, state2], (values) {
@@ -360,29 +297,3 @@ class ValueState<V> extends FrappeObject<V> {
     }
   }
 }
-/*
-class OptionalValueState<V> extends ValueState<Optional<V>> {
-  OptionalValueState.constant(Optional<V> initValue)
-      : super.constant(initValue);
-
-  OptionalValueState.constantEmpty() : super.constant(Optional<V>.empty());
-
-  OptionalValueState.constantOf(V initValue)
-      : super.constant(Optional<V>.of(initValue));
-
-  OptionalValueState._(
-      LazyValue<Optional<V>> lazyInitValue, OptionalEventStream<V> stream)
-      : super._(lazyInitValue, stream);
-
-  @override
-  OptionalValueState<VV> asOptional<VV>() =>
-      throw StateError('Already optional');
-
-  @override
-  FrappeReference<OptionalValueState<V>> toReference() => FrappeReference(this);
-
-  ValueState<bool> mapIsEmptyOptional() => map((value) => !value.isPresent);
-
-  ValueState<bool> mapIsPresentOptional() => map((value) => value.isPresent);
-}
-*/

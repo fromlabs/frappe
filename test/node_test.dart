@@ -227,7 +227,7 @@ void main() {
     late final KeyNode<int> node1;
     late final KeyNode<int> node2;
     late final KeyNode<int> node3;
-    late final Reference<KeyNode<int>> node3Ref;
+    late Reference<KeyNode<int>> node3Ref;
 
     Transaction.run((tx) {
       node1 = KeyNode<int>(debugLabel: 'N1');
@@ -356,14 +356,15 @@ void main() {
         ..link(node32, key: 0)
         ..link(node21, key: 1);
 
-      var previousEvaluation = NodeEvaluation.not();
+      var previousEvaluation = NodeEvaluation<int>.not();
       final distinct = KeyNode<int>(
         debugLabel: 'DISTINCT',
         evaluateHandler: (inputs) => (previousEvaluation.isNotEvaluated ||
                 inputs.evaluation.value != previousEvaluation.value
             ? inputs.evaluation
-            : NodeEvaluation.not()) as NodeEvaluation<int>,
-        commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
+            : NodeEvaluation<int>.not()) as NodeEvaluation<int>,
+        commitHandler: (value) =>
+            previousEvaluation = NodeEvaluation<int>(value),
       )..link(merge1);
 
       final listen = KeyNode<int>(
