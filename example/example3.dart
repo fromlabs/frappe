@@ -26,7 +26,7 @@ void main() {
 
   disposableCollector.dispose();
 
-  // assert that all listeners are canceled
+  // assert that all references are disposed
   FrappeObject.assertCleanState();
 }
 
@@ -78,21 +78,29 @@ class KeypadFlut {
 
     valueState = valueStateLink.state;
 
-    valueStateLink.connect(keypadStream
-        .snapshot<int, int>(
-            valueState,
-            (key, total) => key == NumericKey.clear
-                ? 0
-                : (total < 9999
-                    ? total * 10 + NumericKey.values.indexOf(key)
-                    : total))
-        .toState(0));
+    final updateValueStream =
+        keypadStream.snapshot<int, int?>(valueState, (key, value) {
+      if (key == NumericKey.clear) {
+        return 0;
+      } else {
+        final value10 = value * 10;
 
-    beepStream = keypadStream
-        .snapshot<int, bool>(valueState,
-            (key, total) => key == NumericKey.clear || total >= 9999)
-        .where((value) => value == true)
-        .mapTo(unit);
+        if (value10 <= 100000) {
+          return value10 + NumericKey.values.indexOf(key);
+        } else {
+          return null;
+        }
+      }
+    });
+
+    valueStateLink.connect(updateValueStream.whereType<int>().toState(0));
+
+    beepStream = updateValueStream
+        .where((value) => value == null)
+        .mapToUnit()
+        .orElse(keypadStream
+            .where((value) => value == NumericKey.clear)
+            .mapToUnit());
   }
 }
 
@@ -110,6 +118,16 @@ enum NumericKey {
   clear
 }
 
+extension ExtendedBoolEventStream on EventStream<bool> {
+  EventStream<bool> whereIsTrue() => where((value) => value == true);
+
+  EventStream<bool> whereIsFalse() => where((value) => value == false);
+}
+
+extension ExtendedEventStream<E> on EventStream<E> {
+  EventStream<Unit> mapToUnit() => mapTo(unit);
+}
+
 abstract class FrappeBloc implements Disposable {
   final _disposableCollector = DisposableCollector();
 
@@ -121,12 +139,12 @@ abstract class FrappeBloc implements Disposable {
   void init();
 
   @protected
-  EventStreamSink<E> createEventStreamSink<E>() =>
-      registerEventStreamSink(EventStreamSink<E>());
+  EventStreamSink<E> createEventStreamSink<E>([Merger<E>? merger]) =>
+      registerEventStreamSink(EventStreamSink<E>(merger));
 
   @protected
-  ValueStateSink<V> createValueStateSink<V>(V initValue) =>
-      registerValueStateSink(ValueStateSink<V>(initValue));
+  ValueStateSink<V> createValueStateSink<V>(V initValue, [Merger<V>? merger]) =>
+      registerValueStateSink(ValueStateSink<V>(initValue, merger));
 
   @protected
   EventStreamSink<E> registerEventStreamSink<E>(
