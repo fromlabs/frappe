@@ -1,4 +1,5 @@
 import 'package:frappe/frappe.dart';
+import 'package:meta/meta.dart';
 
 void main() {
   final disposableCollector = DisposableCollector();
@@ -19,6 +20,10 @@ void main() {
 
   keypadBloc.clear();
 
+  keypadBloc.eight();
+  keypadBloc.nine();
+  keypadBloc.zero();
+
   disposableCollector.dispose();
 
   // assert that all listeners are canceled
@@ -26,76 +31,47 @@ void main() {
 }
 
 // business logic component
-class KeypadBloc implements Disposable {
-  final EventStreamSink<NumericKey> _keypadSink = EventStreamSink<NumericKey>();
+class KeypadBloc extends FrappeBloc {
+  late final EventStreamSink<NumericKey> _keypadSink;
 
-  late final FrappeReference<ValueState<int>> _valueStateReference;
-
-  late final FrappeReference<EventStream<Unit>> _beepStreamReference;
-
-  final _disposableCollector = DisposableCollector();
-
-  KeypadBloc() {
-    _disposableCollector.add(_keypadSink.toDisposable());
-
-    runTransaction(() {
-      final _keypad = Keypad(keypadStream: _keypadSink.stream);
-
-      _valueStateReference =
-          _disposableCollector.add(_keypad.valueState.toReference());
-      _beepStreamReference =
-          _disposableCollector.add(_keypad.beepStream.toReference());
-    });
-  }
+  late final ValueState<int> _valueState;
+  late final EventStream<Unit> _beepStream;
 
   @override
-  void dispose() {
-    _disposableCollector.dispose();
+  void init() {
+    _keypadSink = createEventStreamSink<NumericKey>();
+
+    final _keypadFlut = KeypadFlut(keypadStream: _keypadSink.stream);
+
+    _valueState = registerValueState(_keypadFlut.valueState);
+    _beepStream = registerEventStream(_keypadFlut.beepStream);
   }
 
-  ValueState<int> get valueState => _valueStateReference.object;
+  // outputs
+  ValueState<int> get valueState => _valueState;
+  EventStream<Unit> get beepStream => _beepStream;
 
-  EventStream<Unit> get beepStream => _beepStreamReference.object;
-
+  // commands
   void zero() => _keypadSink.send(NumericKey.zero);
-
   void one() => _keypadSink.send(NumericKey.one);
-
   void two() => _keypadSink.send(NumericKey.two);
-
   void three() => _keypadSink.send(NumericKey.three);
-
   void four() => _keypadSink.send(NumericKey.four);
-
   void five() => _keypadSink.send(NumericKey.five);
-
   void six() => _keypadSink.send(NumericKey.six);
-
   void seven() => _keypadSink.send(NumericKey.seven);
-
   void eight() => _keypadSink.send(NumericKey.eight);
-
   void nine() => _keypadSink.send(NumericKey.nine);
-
   void clear() => _keypadSink.send(NumericKey.clear);
 }
 
-abstract class FrappeBloc implements Disposable {
-  final _disposableCollector = DisposableCollector();
-
-  @override
-  void dispose() {
-    _disposableCollector.dispose();
-  }
-}
-
 // functional logic unit
-class Keypad {
+class KeypadFlut {
   late final ValueState<int> valueState;
 
   late final EventStream<Unit> beepStream;
 
-  Keypad({
+  KeypadFlut({
     required EventStream<NumericKey> keypadStream,
   }) {
     final valueStateLink = ValueStateLink<int>();
@@ -105,16 +81,16 @@ class Keypad {
     valueStateLink.connect(keypadStream
         .snapshot<int, int>(
             valueState,
-            (key, total) => key != NumericKey.clear
-                ? (total < 9999
-                    ? (total * 10) + NumericKey.values.indexOf(key)
-                    : total)
-                : 0)
+            (key, total) => key == NumericKey.clear
+                ? 0
+                : (total < 9999
+                    ? total * 10 + NumericKey.values.indexOf(key)
+                    : total))
         .toState(0));
 
     beepStream = keypadStream
         .snapshot<int, bool>(valueState,
-            (key, total) => key != NumericKey.clear ? (total >= 9999) : false)
+            (key, total) => key == NumericKey.clear || total >= 9999)
         .where((value) => value == true)
         .mapTo(unit);
   }
@@ -132,4 +108,58 @@ enum NumericKey {
   eight,
   nine,
   clear
+}
+
+abstract class FrappeBloc implements Disposable {
+  final _disposableCollector = DisposableCollector();
+
+  FrappeBloc() {
+    runTransaction(init);
+  }
+
+  @protected
+  void init();
+
+  @protected
+  EventStreamSink<E> createEventStreamSink<E>() =>
+      registerEventStreamSink(EventStreamSink<E>());
+
+  @protected
+  ValueStateSink<V> createValueStateSink<V>(V initValue) =>
+      registerValueStateSink(ValueStateSink<V>(initValue));
+
+  @protected
+  EventStreamSink<E> registerEventStreamSink<E>(
+      EventStreamSink<E> eventStreamSink) {
+    _disposableCollector.add(eventStreamSink.toDisposable());
+
+    return eventStreamSink;
+  }
+
+  @protected
+  ValueStateSink<V> registerValueStateSink<V>(
+      ValueStateSink<V> valueStateSink) {
+    _disposableCollector.add(valueStateSink.toDisposable());
+
+    return valueStateSink;
+  }
+
+  @protected
+  EventStream<E> registerEventStream<E>(EventStream<E> eventStream) {
+    _disposableCollector.add(eventStream.toReference());
+
+    return eventStream;
+  }
+
+  @protected
+  ValueState<V> registerValueState<V>(ValueState<V> valueState) {
+    _disposableCollector.add(valueState.toReference());
+
+    return valueState;
+  }
+
+  @override
+  void dispose() {
+    _disposableCollector.dispose();
+  }
 }

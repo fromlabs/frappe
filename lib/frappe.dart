@@ -12,6 +12,6 @@ export 'src/lazy_value.dart';
 export 'src/frappe_object.dart' show FrappeObject;
 export 'src/event_stream.dart'
     show EventStream, EventStreamLink, EventStreamSink;
-export 'src/value_state.dart' show ValueState, ValueStateSink, ValueStateLink;
+export 'src/value_state.dart' show ValueState, ValueStateLink, ValueStateSink;
 export 'src/frappe_disposable.dart';
 export 'src/frappe_reference.dart';
