@@ -12,10 +12,8 @@ class KeypadFlut {
   }) {
     final valueStateLink = ValueStateLink<int>();
 
-    valueState = valueStateLink.state;
-
     final updateValueStream =
-        keypadStream.snapshot<int, int?>(valueState, (key, value) {
+        keypadStream.snapshot<int, int?>(valueStateLink.state, (key, value) {
       if (key == NumericKey.clear) {
         return 0;
       } else {
@@ -30,6 +28,8 @@ class KeypadFlut {
     });
 
     valueStateLink.connect(updateValueStream.whereType<int>().toState(0));
+
+    valueState = valueStateLink.state;
 
     beepStream = updateValueStream
         .whereNull()
