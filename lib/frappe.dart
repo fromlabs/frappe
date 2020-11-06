@@ -15,3 +15,4 @@ export 'src/event_stream.dart'
 export 'src/value_state.dart' show ValueState, ValueStateLink, ValueStateSink;
 export 'src/frappe_disposable.dart';
 export 'src/frappe_reference.dart';
+export 'src/extension.dart';

@@ -1,0 +1,27 @@
+name: testapp
+description: A new Flutter project.
+
+publish_to: 'none'
+
+version: 0.1.0
+
+environment:
+  sdk: '>=2.11.0-213.0.dev <2.12.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.0
+
+  frappe:
+    path: ../..
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  pedantic: ^1.10.0-nullsafety.2
+
+flutter:
+  uses-material-design: true

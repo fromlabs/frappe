@@ -6,15 +6,11 @@ import 'package:frappe/src/reference.dart';
 import 'package:frappe/src/typedef.dart';
 import 'package:frappe/src/value_state.dart';
 
-extension NullableEventStreamSink<E> on EventStreamSink<E?> {
-  void sendNull() => send(null);
+extension ExtendedEventStream<E> on EventStream<E> {
+  Node<E> get node => _node;
 }
 
-extension NullableEventStream<E> on EventStream<E?> {
-  EventStream<bool> mapIsNull() => map((event) => event == null);
-
-  EventStream<bool> mapIsNotNull() => map((event) => event != null);
-
+extension _NullableEventStream<E> on EventStream<E?> {
   EventStream<E> mapWhereNotNull() => whereType<E>();
 }
 
@@ -28,10 +24,6 @@ Merger<E> _defaultMergerFactory<E>() => (E value1, E value2) => value1;
 
 NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
     inputs.evaluation as NodeEvaluation<E>;
-
-extension ExtendedEventStream<E> on EventStream<E> {
-  Node<E> get node => _node;
-}
 
 class EventStreamSink<E> {
   final EventStream<E> stream;

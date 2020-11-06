@@ -10,16 +10,6 @@ extension ExtendedValueState<V> on ValueState<V> {
   Node<V> get node => _node;
 }
 
-extension NullableValueStateSink<V> on ValueStateSink<V?> {
-  void sendNull() => send(null);
-}
-
-extension NullableValueState<V> on ValueState<V?> {
-  ValueState<bool> mapIsNull() => map((value) => value == null);
-
-  ValueState<bool> mapIsNotNull() => map((value) => value != null);
-}
-
 ValueState<V> createValueState<V>(
         LazyValue<V> lazyInitValue, EventStream<V> stream) =>
     ValueState._(lazyInitValue, stream);

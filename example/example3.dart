@@ -118,16 +118,6 @@ enum NumericKey {
   clear
 }
 
-extension ExtendedBoolEventStream on EventStream<bool> {
-  EventStream<bool> whereIsTrue() => where((value) => value == true);
-
-  EventStream<bool> whereIsFalse() => where((value) => value == false);
-}
-
-extension ExtendedEventStream<E> on EventStream<E> {
-  EventStream<Unit> mapToUnit() => mapTo(unit);
-}
-
 abstract class FrappeBloc implements Disposable {
   final _disposableCollector = DisposableCollector();
 

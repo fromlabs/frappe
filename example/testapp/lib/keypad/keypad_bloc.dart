@@ -1,0 +1,47 @@
+import 'package:frappe/frappe.dart';
+import 'package:testapp/frappe_bloc.dart';
+import 'package:testapp/keypad/keypad_flut.dart';
+import 'package:testapp/keypad/keypad_model.dart';
+
+// business logic component
+abstract class KeypadBloc {
+  // outputs
+  ValueState<int> get valueState;
+  EventStream<Unit> get beepStream;
+
+  // commands
+  void digit(int keypadDigit);
+  void clear();
+}
+
+class KeypadBlocImpl extends FrappeBloc implements KeypadBloc {
+  late final EventStreamSink<NumericKey> _keypadSink;
+
+  late final ValueState<int> _valueState;
+  late final EventStream<Unit> _beepStream;
+
+  @override
+  void init() {
+    _keypadSink = createEventStreamSink<NumericKey>();
+
+    final _keypadFlut = KeypadFlut(keypadStream: _keypadSink.stream);
+
+    _valueState = registerValueState(_keypadFlut.valueState);
+    _beepStream = registerEventStream(_keypadFlut.beepStream);
+  }
+
+  // outputs
+  @override
+  ValueState<int> get valueState => _valueState;
+
+  @override
+  EventStream<Unit> get beepStream => _beepStream;
+
+  // commands
+  @override
+  void digit(int keypadDigit) =>
+      _keypadSink.send(NumericKey.values[keypadDigit]);
+
+  @override
+  void clear() => _keypadSink.send(NumericKey.clear);
+}
