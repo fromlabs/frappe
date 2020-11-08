@@ -1,5 +1,5 @@
 import 'package:frappe/frappe.dart';
-import 'package:testapp/frappe_bloc.dart';
+import 'package:testapp/core/frappe_bloc.dart';
 import 'package:testapp/keypad/keypad_flut.dart';
 import 'package:testapp/keypad/keypad_model.dart';
 
@@ -24,10 +24,10 @@ class KeypadBlocImpl extends FrappeBloc implements KeypadBloc {
   void init() {
     _keypadSink = createEventStreamSink<NumericKey>();
 
-    final _keypadFlut = KeypadFlut(keypadStream: _keypadSink.stream);
+    final _keypadFlutOutput = keypadFlut(keypadStream: _keypadSink.stream);
 
-    _valueState = registerValueState(_keypadFlut.valueState);
-    _beepStream = registerEventStream(_keypadFlut.beepStream);
+    _valueState = registerValueState(_keypadFlutOutput.valueState);
+    _beepStream = registerEventStream(_keypadFlutOutput.beepStream);
   }
 
   // outputs

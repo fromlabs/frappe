@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:testapp/counter_bloc.dart';
-import 'package:testapp/value_state_builder.dart';
+import 'package:testapp/core/value_state_builder.dart';
 
 void main() {
   runApp(MyApp());

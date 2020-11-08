@@ -1,5 +1,5 @@
 import 'package:frappe/frappe.dart';
-import 'package:testapp/frappe_bloc.dart';
+import 'package:testapp/core/frappe_bloc.dart';
 
 class CounterBloc extends FrappeBloc {
   late final EventStreamSink<Unit> _incrementSink;

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frappe/src/listen_subscription.dart';
 import 'package:testapp/keypad/keypad_bloc.dart';
-import 'package:testapp/value_state_builder.dart';
+import 'package:testapp/core/value_state_builder.dart';
 
 void main() {
   runApp(MyApp());

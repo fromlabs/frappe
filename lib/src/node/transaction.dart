@@ -4,6 +4,7 @@ import 'dart:collection';
 import 'package:frappe/src/node/node.dart';
 import 'package:frappe/src/node/node_evaluation.dart';
 import 'package:frappe/src/reference.dart';
+import 'package:frappe/src/transaction.dart';
 
 typedef TransactionHandler = void Function(Transaction transaction);
 typedef TransactionRunner<T> = T Function(Transaction transaction);
@@ -57,19 +58,23 @@ class Transaction {
       try {
         transaction = Transaction();
 
-        final result = runZoned<T>(() {
-          final result = runner(transaction);
+        final result = runZoned<T>(
+          () {
+            final result = runner(transaction);
 
-          transaction._evaluate();
+            transaction._evaluate();
 
-          transaction._commitValue();
+            transaction._commitValue();
 
-          transaction._publishValue();
+            transaction._publishValue();
 
-          transaction._notifyClosingTransaction();
+            transaction._notifyClosingTransaction();
 
-          return result;
-        }, zoneValues: {_transactionZoneParameter: transaction});
+            return result;
+          },
+          zoneValues: {_transactionZoneParameter: transaction},
+        );
+
         return result;
       } finally {
         transaction._close();
@@ -236,7 +241,11 @@ class Transaction {
     _phase = TransactionPhase.publish;
 
     for (final entry in _evaluations.entries) {
-      entry.key.publish(entry.value.value);
+      try {
+        entry.key.publish(entry.value.value);
+      } catch (e, s) {
+        onError(e, s);
+      }
     }
   }
 
