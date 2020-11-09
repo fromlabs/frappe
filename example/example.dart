@@ -2,18 +2,21 @@ import 'package:frappe/frappe.dart';
 
 void main() {
   // event stream sink
-  final plusStreamSink = EventStreamSink<Unit>();
-  final minusStreamSink = EventStreamSink<Unit>();
-
-  // event stream
-  final plusStream = plusStreamSink.stream;
-  final minusStream = minusStreamSink.stream;
+  late final EventStreamSink<Unit> plusStreamSink;
+  late final EventStreamSink<Unit> minusStreamSink;
 
   late final FrappeReference<ValueState<int>> totalStateReference;
-
   late final ListenSubscription subscription;
 
   runTransaction(() {
+    // event stream sink
+    plusStreamSink = EventStreamSink<Unit>();
+    minusStreamSink = EventStreamSink<Unit>();
+
+    // event stream
+    final plusStream = plusStreamSink.stream;
+    final minusStream = minusStreamSink.stream;
+
     // mapTo/map operator
     final incrementStream = plusStream.mapTo<int>(1);
     final decrementStream = minusStream.mapTo<int>(-1);
@@ -66,10 +69,6 @@ void main() {
 
   // dispose reference to state
   totalStateReference.dispose();
-
-  // close sinks
-  plusStreamSink.close();
-  minusStreamSink.close();
 
   // assert that all listeners are canceled
   FrappeObject.assertCleanState();

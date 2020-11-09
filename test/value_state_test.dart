@@ -18,7 +18,13 @@ void main() {
     });
 
     test('Test 02', () {
-      final sink = ValueStateSink<int>(-1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(-1);
+        stateReference = sink.state.toReference();
+      });
 
       sink.send(0);
 
@@ -48,11 +54,17 @@ void main() {
 
       expect(events1, isEmpty);
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 03', () {
-      final sink = ValueStateSink<int>(0);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(0);
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int>();
       final subscription1 = sink.state.listen((event) {
@@ -67,11 +79,17 @@ void main() {
 
       expect(events1, isEmpty);
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 04', () {
-      final sink = ValueStateSink<int>(-1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(-1);
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int>();
       late final ListenSubscription subscription1;
@@ -93,11 +111,17 @@ void main() {
 
       expect(events1, isEmpty);
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 05', () {
-      final sink = ValueStateSink<int>(-1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(-1);
+        stateReference = sink.state.toReference();
+      });
 
       sink.send(0);
 
@@ -128,11 +152,17 @@ void main() {
 
       expect(events1, isEmpty);
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 06', () {
-      final sink = ValueStateSink<int>(1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(1);
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -153,11 +183,17 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 07', () {
-      final sink = ValueStateSink<int>(0);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(0);
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int?>();
 
@@ -197,11 +233,17 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 08', () {
-      final sink = ValueStateSink<int>(-1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(-1);
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -242,11 +284,17 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 09', () {
-      final sink = ValueStateSink<int>(1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(1);
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -272,12 +320,21 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 10', () {
-      final sink1 = ValueStateSink<int>(1);
-      final sink2 = ValueStateSink<int>(2);
+      late final ValueStateSink<int> sink1;
+      late final ValueStateSink<int> sink2;
+      late final FrappeReference<ValueState<int>> stateReference1;
+      late final FrappeReference<ValueState<int>> stateReference2;
+
+      runTransaction(() {
+        sink1 = ValueStateSink<int>(1);
+        sink2 = ValueStateSink<int>(2);
+        stateReference1 = sink1.state.toReference();
+        stateReference2 = sink2.state.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -314,16 +371,30 @@ void main() {
 
       subscription1.cancel();
 
-      sink1.close();
-      sink2.close();
+      stateReference1.dispose();
+      stateReference2.dispose();
     });
 
     test('Test 11', () {
-      final sink = runTransaction(
-          () => ValueStateSink<EventStream<int>>(EventStream.never()));
+      late final ValueStateSink<EventStream<int>> sink;
+      late final FrappeReference<ValueState<EventStream<int>>> stateReference;
 
-      final sink1 = EventStreamSink<int>();
-      final sink2 = EventStreamSink<int>();
+      runTransaction(() {
+        sink = ValueStateSink<EventStream<int>>(EventStream.never());
+        stateReference = sink.state.toReference();
+      });
+
+      late final EventStreamSink<int> sink1;
+      late final EventStreamSink<int> sink2;
+      late final FrappeReference<EventStream<int>> stateReference1;
+      late final FrappeReference<EventStream<int>> stateReference2;
+
+      runTransaction(() {
+        sink1 = EventStreamSink<int>();
+        sink2 = EventStreamSink<int>();
+        stateReference1 = sink1.stream.toReference();
+        stateReference2 = sink2.stream.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -372,14 +443,20 @@ void main() {
 
       subscription1.cancel();
 
-      sink1.close();
-      sink2.close();
-      sink.close();
+      stateReference1.dispose();
+      stateReference2.dispose();
+
+      stateReference.dispose();
     });
 
     test('Test 12', () {
-      final sink = runTransaction(
-          () => ValueStateSink<ValueState<int>>(ValueState.constant(0)));
+      late final ValueStateSink<ValueState<int>> sink;
+      late final FrappeReference<ValueState<ValueState<int>>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<ValueState<int>>(ValueState.constant(0));
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -394,12 +471,21 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 13', () {
-      final sink1 = ValueStateSink<int>(1);
-      final sink2 = ValueStateSink<int>(2);
+      late final ValueStateSink<int> sink1;
+      late final ValueStateSink<int> sink2;
+      late final FrappeReference<ValueState<int>> stateReference1;
+      late final FrappeReference<ValueState<int>> stateReference2;
+
+      runTransaction(() {
+        sink1 = ValueStateSink<int>(1);
+        sink2 = ValueStateSink<int>(2);
+        stateReference1 = sink1.state.toReference();
+        stateReference2 = sink2.state.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -411,17 +497,23 @@ void main() {
 
       subscription1.cancel();
 
-      sink1.close();
-      sink2.close();
+      stateReference1.dispose();
+      stateReference2.dispose();
     });
 
     test('Test 14', () {
-      final sink1 = ValueStateSink<int>(1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(1);
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int>();
 
       final subscription1 =
-          runTransaction(() => sink1.state.toValues().listen((event) {
+          runTransaction(() => sink.state.toValues().listen((event) {
                 events1.addLast(event);
               }));
 
@@ -435,7 +527,7 @@ void main() {
 
       subscription1.cancel();
 
-      sink1.close();
+      stateReference.dispose();
     });
   });
 
@@ -445,8 +537,17 @@ void main() {
     });
 
     test('Test 10', () {
-      final sink1 = ValueStateSink<int>(1);
-      final sink2 = ValueStateSink<int>(2);
+      late final ValueStateSink<int> sink1;
+      late final ValueStateSink<int> sink2;
+      late final FrappeReference<ValueState<int>> stateReference1;
+      late final FrappeReference<ValueState<int>> stateReference2;
+
+      runTransaction(() {
+        sink1 = ValueStateSink<int>(1);
+        sink2 = ValueStateSink<int>(2);
+        stateReference1 = sink1.state.toReference();
+        stateReference2 = sink2.state.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -483,13 +584,18 @@ void main() {
 
       subscription1.cancel();
 
-      sink1.close();
-      sink2.close();
+      stateReference1.dispose();
+      stateReference2.dispose();
     });
 
     test('Test 12', () {
-      final sink = runTransaction(
-          () => ValueStateSink<ValueState<int?>>(ValueState.constant(0)));
+      late final ValueStateSink<ValueState<int?>> sink;
+      late final FrappeReference<ValueState<ValueState<int?>>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<ValueState<int?>>(ValueState.constant(0));
+        stateReference = sink.state.toReference();
+      });
 
       final events1 = Queue<int?>();
 
@@ -504,19 +610,25 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      stateReference.dispose();
     });
   });
 
   group('ValueStateSink 03', () {
     test('Test 01', () {
-      final sink = ValueStateSink<int>(1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(1);
+        stateReference = sink.state.toReference();
+      });
 
       expect(sink.isClosed, isFalse);
 
       sink.send(1);
 
-      sink.close();
+      stateReference.dispose();
 
       expect(sink.isClosed, isTrue);
 
@@ -524,7 +636,13 @@ void main() {
     });
 
     test('Test 02', () {
-      final sink = ValueStateSink<int>(1);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(1);
+        stateReference = sink.state.toReference();
+      });
 
       sink.send(1);
 
@@ -540,11 +658,17 @@ void main() {
         expect(() => sink.send(5), throwsUnsupportedError);
       });
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 03', () {
-      final sink = ValueStateSink<int>(1, (newValue, oldValue) => newValue);
+      late final ValueStateSink<int> sink;
+      late final FrappeReference<ValueState<int>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int>(1, (newValue, oldValue) => newValue);
+        stateReference = sink.state.toReference();
+      });
 
       sink.send(1);
 
@@ -560,19 +684,25 @@ void main() {
         sink.send(5);
       });
 
-      sink.close();
+      stateReference.dispose();
     });
   });
 
   group('OptionalValueStateSink 04', () {
     test('Test 01', () {
-      final sink = ValueStateSink<int?>(1);
+      late final ValueStateSink<int?> sink;
+      late final FrappeReference<ValueState<int?>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int?>(1);
+        stateReference = sink.state.toReference();
+      });
 
       expect(sink.isClosed, isFalse);
 
       sink.send(1);
 
-      sink.close();
+      stateReference.dispose();
 
       expect(sink.isClosed, isTrue);
 
@@ -580,7 +710,13 @@ void main() {
     });
 
     test('Test 02', () {
-      final sink = ValueStateSink<int?>(1);
+      late final ValueStateSink<int?> sink;
+      late final FrappeReference<ValueState<int?>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int?>(1);
+        stateReference = sink.state.toReference();
+      });
 
       sink.send(1);
 
@@ -596,11 +732,17 @@ void main() {
         expect(() => sink.send(5), throwsUnsupportedError);
       });
 
-      sink.close();
+      stateReference.dispose();
     });
 
     test('Test 03', () {
-      final sink = ValueStateSink<int?>(null, (newValue, oldValue) => newValue);
+      late final ValueStateSink<int?> sink;
+      late final FrappeReference<ValueState<int?>> stateReference;
+
+      runTransaction(() {
+        sink = ValueStateSink<int?>(null, (newValue, oldValue) => newValue);
+        stateReference = sink.state.toReference();
+      });
 
       sink.send(1);
 
@@ -616,7 +758,7 @@ void main() {
         sink.send(5);
       });
 
-      sink.close();
+      stateReference.dispose();
     });
   });
 }

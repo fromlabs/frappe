@@ -18,7 +18,13 @@ void main() {
     });
 
     test('Test 04', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       sink.send(0);
 
@@ -73,11 +79,17 @@ void main() {
       expect(events2, isEmpty);
       expect(events3, isEmpty);
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 05', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       late final ListenSubscription subscription1;
       late final ListenSubscription subscription2;
@@ -129,20 +141,32 @@ void main() {
       expect(events2, isEmpty);
       expect(events3, isEmpty);
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 06', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       expect(
           () => sink.stream.map((value) => 2 * value), throwsUnsupportedError);
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 07', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -160,12 +184,17 @@ void main() {
       expect(events1, isEmpty);
 
       subscription1.cancel();
-
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 08', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -204,11 +233,17 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 09', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -247,11 +282,17 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 10', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       final events1 = Queue<int?>();
 
@@ -289,11 +330,17 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 11', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -314,11 +361,17 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 12', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -345,11 +398,17 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 13', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       sink.send(0);
 
@@ -391,12 +450,21 @@ void main() {
       expect(events1, isEmpty);
       expect(events2, isEmpty);
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 14', () {
-      final sink1 = EventStreamSink<int>();
-      final sink2 = EventStreamSink<int>();
+      late final EventStreamSink<int> sink1;
+      late final EventStreamSink<int> sink2;
+      late final FrappeReference<EventStream<int>> streamReference1;
+      late final FrappeReference<EventStream<int>> streamReference2;
+
+      runTransaction(() {
+        sink1 = EventStreamSink<int>();
+        sink2 = EventStreamSink<int>();
+        streamReference1 = sink1.stream.toReference();
+        streamReference2 = sink2.stream.toReference();
+      });
 
       sink1.send(1);
       sink2.send(-1);
@@ -437,12 +505,18 @@ void main() {
 
       expect(events1, isEmpty);
 
-      sink1.close();
-      sink2.close();
+      streamReference1.dispose();
+      streamReference2.dispose();
     });
 
     test('Test 15', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       final events1 = Queue<int>();
 
@@ -470,12 +544,21 @@ void main() {
 
       subscription1.cancel();
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 16', () {
-      final sink1 = EventStreamSink<int>();
-      final sink2 = EventStreamSink<int>();
+      late final EventStreamSink<int> sink1;
+      late final EventStreamSink<int> sink2;
+      late final FrappeReference<EventStream<int>> streamReference1;
+      late final FrappeReference<EventStream<int>> streamReference2;
+
+      runTransaction(() {
+        sink1 = EventStreamSink<int>();
+        sink2 = EventStreamSink<int>();
+        streamReference1 = sink1.stream.toReference();
+        streamReference2 = sink2.stream.toReference();
+      });
 
       sink1.send(1);
       sink2.send(-1);
@@ -516,8 +599,8 @@ void main() {
 
       expect(events1, isEmpty);
 
-      sink1.close();
-      sink2.close();
+      streamReference1.dispose();
+      streamReference2.dispose();
     });
 
     test('Test 17', () {
@@ -554,7 +637,6 @@ void main() {
       subscription1.cancel();
 
       streamReference.dispose();
-      sink.close();
     });
   });
 
@@ -566,13 +648,19 @@ void main() {
 
   group('EventStreamSink', () {
     test('Test 01', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       expect(sink.isClosed, isFalse);
 
       sink.send(1);
 
-      sink.close();
+      streamReference.dispose();
 
       expect(sink.isClosed, isTrue);
 
@@ -580,7 +668,13 @@ void main() {
     });
 
     test('Test 02', () {
-      final sink = EventStreamSink<int>();
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>();
+        streamReference = sink.stream.toReference();
+      });
 
       sink.send(1);
 
@@ -596,11 +690,17 @@ void main() {
         expect(() => sink.send(5), throwsUnsupportedError);
       });
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 03', () {
-      final sink = EventStreamSink<int>((newValue, oldValue) => newValue);
+      late final EventStreamSink<int> sink;
+      late final FrappeReference<EventStream<int>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int>((newValue, oldValue) => newValue);
+        streamReference = sink.stream.toReference();
+      });
 
       sink.send(1);
 
@@ -616,19 +716,25 @@ void main() {
         sink.send(5);
       });
 
-      sink.close();
+      streamReference.dispose();
     });
   });
 
   group('OptionalEventStreamSink', () {
     test('Test 01', () {
-      final sink = EventStreamSink<int?>();
+      late final EventStreamSink<int?> sink;
+      late final FrappeReference<EventStream<int?>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int?>();
+        streamReference = sink.stream.toReference();
+      });
 
       expect(sink.isClosed, isFalse);
 
       sink.send(1);
 
-      sink.close();
+      streamReference.dispose();
 
       expect(sink.isClosed, isTrue);
 
@@ -636,7 +742,13 @@ void main() {
     });
 
     test('Test 02', () {
-      final sink = EventStreamSink<int?>();
+      late final EventStreamSink<int?> sink;
+      late final FrappeReference<EventStream<int?>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int?>();
+        streamReference = sink.stream.toReference();
+      });
 
       sink.send(1);
 
@@ -652,11 +764,17 @@ void main() {
         expect(() => sink.send(5), throwsUnsupportedError);
       });
 
-      sink.close();
+      streamReference.dispose();
     });
 
     test('Test 03', () {
-      final sink = EventStreamSink<int?>((newValue, oldValue) => newValue);
+      late final EventStreamSink<int?> sink;
+      late final FrappeReference<EventStream<int?>> streamReference;
+
+      runTransaction(() {
+        sink = EventStreamSink<int?>((newValue, oldValue) => newValue);
+        streamReference = sink.stream.toReference();
+      });
 
       sink.send(1);
 
@@ -676,7 +794,7 @@ void main() {
 
       ref.dispose();
 
-      sink.close();
+      streamReference.dispose();
     });
   });
 

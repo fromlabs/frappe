@@ -27,7 +27,7 @@ class ValueStateSink<V> {
 
   factory ValueStateSink.lazy(LazyValue<V> lazyInitValue,
           [Merger<V>? merger]) =>
-      Transaction.run((transaction) {
+      Transaction.runRequired((transaction) {
         final eventStreamSink = EventStreamSink<V>(merger);
 
         return ValueStateSink<V>._(
@@ -38,8 +38,6 @@ class ValueStateSink<V> {
   ValueStateSink._(this.state, this._eventStreamSink);
 
   bool get isClosed => _eventStreamSink.isClosed;
-
-  void close() => _eventStreamSink.close();
 
   void send(V value) => _eventStreamSink.send(value);
 }
@@ -172,8 +170,6 @@ class ValueState<V> extends FrappeObject<V> {
 
   bool get isReferenced => _node.isReferenced;
 
-  bool get isUnreferenced => !isReferenced;
-
   V getValue() => Transaction.run((transaction) => getLazyValue().get());
 
   LazyValue<V> getLazyValue() => _currentLazyValue;
@@ -264,6 +260,11 @@ class ValueState<V> extends FrappeObject<V> {
 
   ListenSubscription listen(ValueHandler<V> onValue) =>
       Transaction.run((transaction) => toValues().listen(onValue));
+
+  ValueState<V> addReferencedSubscription(ListenSubscription subscription) {
+    // FIXME roby: implement ValueState.addReferencedSubscription
+    throw UnimplementedError();
+  }
 
   ValueState<VR> switchMapState<VR>(Mapper<V, ValueState<VR>> mapper) =>
       ValueState.switchState<VR>(map<ValueState<VR>>(mapper));

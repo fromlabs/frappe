@@ -27,23 +27,17 @@ NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
 
 class EventStreamSink<E> {
   final EventStream<E> stream;
-  final Reference<Node<E>> _nodeReference;
   final Merger<E> _sinkMerger;
 
   factory EventStreamSink([Merger<E>? sinkMerger]) =>
-      Transaction.run((_) => EventStreamSink._(
+      Transaction.runRequired((_) => EventStreamSink._(
           EventStream<E>._(KeyNode<E>(evaluationType: EvaluationType.never)),
           sinkMerger));
 
   EventStreamSink._(this.stream, Merger<E>? sinkMerger)
-      : _nodeReference = Reference(stream._node),
-        _sinkMerger = sinkMerger ?? _defaultSinkMergerFactory<E>();
+      : _sinkMerger = sinkMerger ?? _defaultSinkMergerFactory<E>();
 
-  bool get isClosed => _nodeReference.isDisposed;
-
-  bool get isNotClosed => !isClosed;
-
-  void close() => _nodeReference.dispose();
+  bool get isClosed => !stream.isReferenced;
 
   void send(E event) {
     if (isClosed) {
@@ -141,8 +135,6 @@ class EventStream<E> extends FrappeObject<E> {
   }
 
   bool get isReferenced => _node.isReferenced;
-
-  bool get isUnreferenced => !isReferenced;
 
   ValueState<E> toState(E initValue) => toStateLazy(LazyValue.value(initValue));
 
@@ -284,11 +276,9 @@ class EventStream<E> extends FrappeObject<E> {
           publishHandler: onEvent,
         );
 
-        final reference = Reference(listenNode);
-
         listenNode.link(_node);
 
-        return _ReferenceListenSubscription(reference);
+        return _ReferenceListenSubscription(Reference(listenNode));
       });
 
   ListenSubscription listenOnce(ValueHandler<E> onEvent) {
@@ -302,6 +292,15 @@ class EventStream<E> extends FrappeObject<E> {
 
     return listenSubscription;
   }
+
+  EventStream<E> addReferencedSubscription(ListenSubscription subscription) =>
+      Transaction.runRequired((transaction) {
+        final targetNode = KeyNode<E>(evaluateHandler: _defaultEvaluateHandler);
+
+        targetNode.link(_node);
+
+        return EventStream._(targetNode);
+      });
 
   void _sendValue(E event, Merger<E> sinkMerger) {
     Transaction.run((transaction) {

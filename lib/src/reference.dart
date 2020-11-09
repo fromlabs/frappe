@@ -1,4 +1,5 @@
 import 'package:frappe/src/disposable.dart';
+import 'package:meta/meta.dart';
 
 class ReferenceGroup implements Disposable {
   final Set<Reference> _references = Set.identity();
@@ -136,15 +137,13 @@ abstract class Referenceable {
 
   bool get isReferenced => _isReferenced;
 
-  bool get isUnreferenced => !_isReferenced;
-
   HostedReference<R> reference<R extends Referenceable>(R value) {
     _hostedGroup._checkDisposed();
 
     return _hostedGroup.add(HostedReference(this, value));
   }
 
-  // @protected
+  @protected
   void onUnreferenced() {
     if (!_hostedGroup.isDisposed) {
       _hostedGroup.dispose();

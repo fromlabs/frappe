@@ -93,7 +93,5 @@ class FrpParadigm implements Paradigm {
   @override
   void dispose() {
     documentUpdateSubscription?.cancel();
-
-    mouseEventStreamSink.close();
   }
 }

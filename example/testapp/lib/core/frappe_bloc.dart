@@ -12,30 +12,6 @@ abstract class FrappeBloc implements Disposable {
   void init();
 
   @protected
-  EventStreamSink<E> createEventStreamSink<E>([Merger<E>? merger]) =>
-      registerEventStreamSink(EventStreamSink<E>(merger));
-
-  @protected
-  ValueStateSink<V> createValueStateSink<V>(V initValue, [Merger<V>? merger]) =>
-      registerValueStateSink(ValueStateSink<V>(initValue, merger));
-
-  @protected
-  EventStreamSink<E> registerEventStreamSink<E>(
-      EventStreamSink<E> eventStreamSink) {
-    _disposableCollector.add(eventStreamSink.toDisposable());
-
-    return eventStreamSink;
-  }
-
-  @protected
-  ValueStateSink<V> registerValueStateSink<V>(
-      ValueStateSink<V> valueStateSink) {
-    _disposableCollector.add(valueStateSink.toDisposable());
-
-    return valueStateSink;
-  }
-
-  @protected
   EventStream<E> registerEventStream<E>(EventStream<E> eventStream) {
     _disposableCollector.add(eventStream.toReference());
 

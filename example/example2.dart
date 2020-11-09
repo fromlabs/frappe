@@ -3,10 +3,11 @@ import 'package:frappe/frappe.dart';
 void main() {
   final disposableCollector = DisposableCollector();
 
-  final keypadSink = EventStreamSink<NumericKey>();
-  disposableCollector.add(keypadSink.toDisposable());
+  late final EventStreamSink<NumericKey> keypadSink;
 
   runTransaction(() {
+    keypadSink = EventStreamSink<NumericKey>();
+
     final keypad = Keypad(keypadStream: keypadSink.stream);
 
     disposableCollector.add((keypad.valueState

@@ -22,7 +22,7 @@ class KeypadBlocImpl extends FrappeBloc implements KeypadBloc {
 
   @override
   void init() {
-    _keypadSink = createEventStreamSink<NumericKey>();
+    _keypadSink = EventStreamSink<NumericKey>();
 
     final _keypadFlutOutput = keypadFlut(keypadStream: _keypadSink.stream);
 

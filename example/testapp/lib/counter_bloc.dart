@@ -8,7 +8,7 @@ class CounterBloc extends FrappeBloc {
 
   @override
   void init() {
-    _incrementSink = createEventStreamSink<Unit>();
+    _incrementSink = EventStreamSink<Unit>();
 
     final stateLink = ValueStateLink<int>();
 

@@ -105,9 +105,9 @@ abstract class Node<S> extends Referenceable {
   void _linkSource(key, Node source) {
     assert(key != null);
 
-    if (isUnreferenced) {
+    if (!isReferenced) {
       throw ArgumentError('Unreferenced target node');
-    } else if (source.isUnreferenced) {
+    } else if (!source.isReferenced) {
       throw ArgumentError('Unreferenced source node');
     }
 
