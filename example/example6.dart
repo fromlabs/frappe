@@ -16,6 +16,8 @@ void main() {
     })).toReference();
   });
 
+  inputSink.send(1);
+
   streamReference.dispose();
 
   // assert that all references are disposed

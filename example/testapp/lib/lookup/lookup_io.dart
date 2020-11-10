@@ -1,12 +1,7 @@
-import 'package:frappe/frappe.dart';
+typedef LookupIo = Future<String?> Function(String);
 
-EventStream<String?> search(EventStream<String> wordStream) {
-  final definitionStreamSink = EventStreamSink<String?>();
+Future<String?> testLookupIo(String word) async {
+  await Future.delayed(Duration(seconds: 1));
 
-  return definitionStreamSink.stream
-      .addReferencedSubscription(wordStream.listen((word) async {
-    await Future.delayed(Duration(seconds: 1));
-
-    definitionStreamSink.send('Definition of $word');
-  }));
+  return 'Definition of $word';
 }

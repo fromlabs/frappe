@@ -14,8 +14,8 @@ ValueState<V> createValueState<V>(
         LazyValue<V> lazyInitValue, EventStream<V> stream) =>
     ValueState._(lazyInitValue, stream);
 
-NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
-    inputs.evaluation as NodeEvaluation<E>;
+NodeEvaluation<V> _defaultEvaluateHandler<V>(NodeEvaluationMap inputs) =>
+    inputs.evaluation as NodeEvaluation<V>;
 
 class ValueStateSink<V> {
   final ValueState<V> state;
@@ -261,10 +261,9 @@ class ValueState<V> extends FrappeObject<V> {
   ListenSubscription listen(ValueHandler<V> onValue) =>
       Transaction.run((transaction) => toValues().listen(onValue));
 
-  ValueState<V> addReferencedSubscription(ListenSubscription subscription) {
-    // FIXME roby: implement ValueState.addReferencedSubscription
-    throw UnimplementedError();
-  }
+  ValueState<V> addReferencedSubscription(ListenSubscription subscription) =>
+      Transaction.runRequired((_) => ValueState._(
+          _currentLazyValue, _stream.addReferencedSubscription(subscription)));
 
   ValueState<VR> switchMapState<VR>(Mapper<V, ValueState<VR>> mapper) =>
       ValueState.switchState<VR>(map<ValueState<VR>>(mapper));

@@ -5,6 +5,7 @@ import 'package:frappe/src/node/node_evaluation_map.dart';
 import 'package:frappe/src/node/transaction.dart';
 import 'package:frappe/src/reference.dart';
 
+typedef Handler = void Function();
 typedef ValueHandler<V> = void Function(V value);
 typedef NodeEvaluator<V> = NodeEvaluation<V> Function(
     Map<dynamic, NodeEvaluation> inputs);
@@ -50,16 +51,21 @@ abstract class Node<S> extends Referenceable {
 
   late ValueHandler<S> publishHandler;
 
+  late Handler unreferencedHandler;
+
   Node({
     String? debugLabel,
     required EvaluationType evaluationType,
     ValueHandler<S>? commitHandler,
     ValueHandler<S>? publishHandler,
+    Handler? unreferencedHandler,
   })  : id = _nodeId++,
         debugLabel = '${debugLabel ?? 'node'}:$_nodeId',
         _evaluationType = evaluationType {
     this.commitHandler = commitHandler ?? (S value) {};
     this.publishHandler = publishHandler ?? (S value) {};
+    this.unreferencedHandler = unreferencedHandler ?? (() {});
+
     _evaluationPriority = 1;
 
     Transaction.onNodeAdded(this);
@@ -87,6 +93,8 @@ abstract class Node<S> extends Referenceable {
 
   @override
   void onUnreferenced() {
+    unreferencedHandler();
+
     Transaction.onNodeRemoved(this);
 
     super.onUnreferenced();
@@ -184,12 +192,14 @@ class IndexNode<S> extends Node<S> {
     IndexNodeEvaluator<S>? evaluateHandler,
     ValueHandler<S>? commitHandler,
     ValueHandler<S>? publishHandler,
+    Handler? unreferencedHandler,
   })  : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler,
         super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
+          unreferencedHandler: unreferencedHandler,
         );
 
   static NodeEvaluation<S> _missingEvaluateHandler<S>(
@@ -245,12 +255,14 @@ class KeyNode<S> extends Node<S> {
     KeyNodeEvaluator<S>? evaluateHandler,
     ValueHandler<S>? commitHandler,
     ValueHandler<S>? publishHandler,
+    Handler? unreferencedHandler,
   })  : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler,
         super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
+          unreferencedHandler: unreferencedHandler,
         );
 
   static NodeEvaluation<S> _missingEvaluateHandler<S>(

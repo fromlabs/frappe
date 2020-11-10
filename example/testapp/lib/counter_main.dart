@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:testapp/counter_bloc.dart';
+import 'package:testapp/counter/counter_bloc.dart';
 import 'package:testapp/core/value_state_builder.dart';
 
 void main() {
@@ -9,11 +9,11 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Flutter Demo',
+        title: 'Counter Demo',
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),
-        home: MyHomePage(title: 'Flutter Demo Home Page'),
+        home: MyHomePage(title: 'Counter Demo'),
       );
 }
 

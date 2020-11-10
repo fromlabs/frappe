@@ -1,15 +1,17 @@
 import 'package:frappe/frappe.dart';
 import 'package:meta/meta.dart';
 
-abstract class FrappeBloc implements Disposable {
+abstract class Bloc {}
+
+abstract class BaseBloc implements Bloc, Disposable {
   final _disposableCollector = DisposableCollector();
 
-  FrappeBloc() {
-    runTransaction(init);
+  BaseBloc() {
+    runTransaction(create);
   }
 
   @protected
-  void init();
+  void create();
 
   @protected
   EventStream<E> registerEventStream<E>(EventStream<E> eventStream) {
@@ -25,6 +27,7 @@ abstract class FrappeBloc implements Disposable {
     return valueState;
   }
 
+  @mustCallSuper
   @override
   void dispose() {
     _disposableCollector.dispose();

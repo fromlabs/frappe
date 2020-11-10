@@ -295,7 +295,9 @@ class EventStream<E> extends FrappeObject<E> {
 
   EventStream<E> addReferencedSubscription(ListenSubscription subscription) =>
       Transaction.runRequired((transaction) {
-        final targetNode = KeyNode<E>(evaluateHandler: _defaultEvaluateHandler);
+        final targetNode = KeyNode<E>(
+            evaluateHandler: _defaultEvaluateHandler,
+            unreferencedHandler: subscription.cancel);
 
         targetNode.link(_node);
 

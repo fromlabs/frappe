@@ -4,7 +4,7 @@ import 'package:testapp/keypad/keypad_flut.dart';
 import 'package:testapp/keypad/keypad_model.dart';
 
 // business logic component
-abstract class KeypadBloc {
+abstract class KeypadBloc implements Bloc {
   // outputs
   ValueState<int> get valueState;
   EventStream<Unit> get beepStream;
@@ -14,14 +14,14 @@ abstract class KeypadBloc {
   void clear();
 }
 
-class KeypadBlocImpl extends FrappeBloc implements KeypadBloc {
+class KeypadBlocImpl extends BaseBloc implements KeypadBloc {
   late final EventStreamSink<NumericKey> _keypadSink;
 
   late final ValueState<int> _valueState;
   late final EventStream<Unit> _beepStream;
 
   @override
-  void init() {
+  void create() {
     _keypadSink = EventStreamSink<NumericKey>();
 
     final _keypadFlutOutput = keypadFlut(keypadStream: _keypadSink.stream);

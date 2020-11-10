@@ -1,13 +1,13 @@
 import 'package:frappe/frappe.dart';
 import 'package:testapp/core/frappe_bloc.dart';
 
-class CounterBloc extends FrappeBloc {
+class CounterBloc extends BaseBloc {
   late final EventStreamSink<Unit> _incrementSink;
 
   late final ValueState<int> _valueState;
 
   @override
-  void init() {
+  void create() {
     _incrementSink = EventStreamSink<Unit>();
 
     final stateLink = ValueStateLink<int>();
