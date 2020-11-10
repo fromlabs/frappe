@@ -16,9 +16,7 @@ class MyApp extends StatelessWidget {
         ),
         home: BlocProvider<LookupBloc>(
             factory: () => LookupBlocImpl(),
-            builder: (context, snapshot) {
-              return MyHomePage(title: 'Lookup Demo');
-            }),
+            builder: (context, snapshot) => MyHomePage(title: 'Lookup Demo')),
       );
 }
 

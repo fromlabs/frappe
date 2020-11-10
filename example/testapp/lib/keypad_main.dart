@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frappe/src/listen_subscription.dart';
+import 'package:testapp/core/view.dart';
 import 'package:testapp/keypad/keypad_bloc.dart';
 import 'package:testapp/core/value_state_builder.dart';
 
@@ -15,7 +16,9 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),
-        home: MyHomePage(title: 'Keypad Demo'),
+        home: BlocProvider<KeypadBloc>(
+            factory: () => KeypadBlocImpl(),
+            builder: (context, snapshot) => MyHomePage(title: 'Keypad Demo')),
       );
 }
 
@@ -29,64 +32,63 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late final KeypadBloc _keypadBloc;
-
   late final ListenSubscription _listener;
 
   @override
   void initState() {
     super.initState();
 
-    _keypadBloc = KeypadBlocImpl();
-
-    _listener = _keypadBloc.beepStream
+    _listener = BlocProvider.of<KeypadBloc>(context)
+        .beepStream
         .listen((_) => SystemSound.play(SystemSoundType.click));
   }
 
   @override
   void dispose() {
     _listener.cancel();
-    (_keypadBloc as KeypadBlocImpl).dispose();
 
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => ValueStateBuilder<int>(
-      state: _keypadBloc.valueState,
-      builder: (context, keypadState) => Scaffold(
-            appBar: AppBar(
-              title: Text(widget.title),
-            ),
-            body: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  '$keypadState',
-                  style: Theme.of(context)!.textTheme.headline4,
+  Widget build(BuildContext context) => BlocInject<KeypadBloc>(
+      builder: (context, keypadBloc) => ValueStateBuilder<int>(
+          state: keypadBloc.valueState,
+          builder: (context, keypadState) => Scaffold(
+                appBar: AppBar(
+                  title: Text(widget.title),
                 ),
-                Expanded(
-                  child: GridView.count(
-                    crossAxisCount: 3,
-                    children: List.generate(10, (index) {
-                      return Center(
-                        child: FlatButton(
-                          child: Text(
-                            '$index',
-                            style: Theme.of(context)!.textTheme.headline5,
-                          ),
-                          onPressed: () => _keypadBloc.digit(index),
-                        ),
-                      );
-                    }),
-                  ),
+                body: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '$keypadState',
+                      style: Theme.of(context)!.textTheme.headline4,
+                    ),
+                    Expanded(
+                      child: GridView.count(
+                        crossAxisCount: 3,
+                        children: List.generate(
+                            10,
+                            (index) => Center(
+                                  child: FlatButton(
+                                    child: Text(
+                                      '$index',
+                                      style: Theme.of(context)!
+                                          .textTheme
+                                          .headline5,
+                                    ),
+                                    onPressed: () => keypadBloc.digit(index),
+                                  ),
+                                )),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: _keypadBloc.clear,
-              tooltip: 'Clear',
-              child: Icon(Icons.clear),
-            ),
-          ));
+                floatingActionButton: FloatingActionButton(
+                  onPressed: keypadBloc.clear,
+                  tooltip: 'Clear',
+                  child: Icon(Icons.clear),
+                ),
+              )));
 }
