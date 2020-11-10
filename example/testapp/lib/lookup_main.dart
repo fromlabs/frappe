@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:testapp/core/value_state_builder.dart';
+import 'package:testapp/core/bloc_state_builder.dart';
 import 'package:testapp/core/view.dart';
 import 'package:testapp/lookup/lookup_bloc.dart';
 
@@ -37,10 +37,7 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
 
     _controller = TextEditingController(
-        text: BlocProvider.of<LookupBloc>(context)
-            .lookupState
-            .getValue()
-            .definition);
+        text: BlocProvider.of<LookupBloc>(context).state.getValue().definition);
   }
 
   @override
@@ -52,8 +49,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) => BlocInject<LookupBloc>(
-      builder: (context, lookupBloc) => ValueStateBuilder<LookupData>(
-          state: lookupBloc.lookupState,
+      builder: (context, lookupBloc) => BlocStateBuilder<LookupData>(
+          bloc: lookupBloc,
           builder: (context, lookupData) => Scaffold(
                 appBar: AppBar(
                   title: Text(widget.title),

@@ -6,8 +6,6 @@ import 'package:testapp/core/frappe_bloc.dart';
 typedef BlocFactory<B extends Bloc> = B Function();
 typedef BlocWidgetBuilder<B extends Bloc> = Widget Function(
     BuildContext context, B bloc);
-typedef BlocStateWidgetBuilder<S> = Widget Function(
-    BuildContext context, S state);
 
 class GlobalBlocKey<B extends Bloc> {
   final GlobalKey<_BlocProviderState<B>> key =

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:testapp/core/bloc_state_builder.dart';
 import 'package:testapp/core/view.dart';
 import 'package:testapp/counter/counter_bloc.dart';
-import 'package:testapp/core/value_state_builder.dart';
 
 void main() {
   runApp(MyApp());
@@ -32,8 +32,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) => BlocInject<CounterBloc>(
-      builder: (context, counterBloc) => ValueStateBuilder<int>(
-          state: counterBloc.valueState,
+      builder: (context, counterBloc) => BlocStateBuilder<int>(
+          bloc: counterBloc,
           builder: (context, counterState) => Scaffold(
                 appBar: AppBar(
                   title: Text(widget.title),

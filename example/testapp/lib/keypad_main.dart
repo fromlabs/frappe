@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frappe/src/listen_subscription.dart';
+import 'package:testapp/core/bloc_state_builder.dart';
 import 'package:testapp/core/view.dart';
 import 'package:testapp/keypad/keypad_bloc.dart';
-import 'package:testapp/core/value_state_builder.dart';
 
 void main() {
   runApp(MyApp());
@@ -52,8 +52,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) => BlocInject<KeypadBloc>(
-      builder: (context, keypadBloc) => ValueStateBuilder<int>(
-          state: keypadBloc.valueState,
+      builder: (context, keypadBloc) => BlocStateBuilder<int>(
+          bloc: keypadBloc,
           builder: (context, keypadState) => Scaffold(
                 appBar: AppBar(
                   title: Text(widget.title),

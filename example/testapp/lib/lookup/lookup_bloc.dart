@@ -17,21 +17,16 @@ class LookupData {
   });
 }
 
-abstract class LookupBloc implements Bloc {
-  // outputs
-  ValueState<LookupData> get lookupState;
-
+abstract class LookupBloc implements Bloc<LookupData> {
   // commands
   void lookup(String word);
 }
 
-class LookupBlocImpl extends BaseBloc implements LookupBloc {
+class LookupBlocImpl extends BaseBloc<LookupData> implements LookupBloc {
   late final EventStreamSink<String> _lookupSink;
 
-  late final ValueState<LookupData> _lookupState;
-
   @override
-  void create() {
+  ValueState<LookupData> create() {
     _lookupSink = EventStreamSink<String>();
 
     final _isBusyFlutOutput = isBusyFlut<String, String?>(
@@ -40,23 +35,18 @@ class LookupBlocImpl extends BaseBloc implements LookupBloc {
             lookupFlut(wordStream: inputStream, lookupIo: testLookupIo)
                 .definitionStream);
 
-    _lookupState = registerValueState(
-        _lookupSink.stream.toState('').combine2<bool, String, LookupData>(
-              _isBusyFlutOutput.isBusyState,
-              _isBusyFlutOutput.outputStream
-                  .map<String>((definition) => definition ?? '')
-                  .toState(''),
-              (word, isBusy, definition) => LookupData(
-                isLoading: isBusy,
-                word: word,
-                definition: definition,
-              ),
-            ));
+    return _lookupSink.stream.toState('').combine2<bool, String, LookupData>(
+          _isBusyFlutOutput.isBusyState,
+          _isBusyFlutOutput.outputStream
+              .map<String>((definition) => definition ?? '')
+              .toState(''),
+          (word, isBusy, definition) => LookupData(
+            isLoading: isBusy,
+            word: word,
+            definition: definition,
+          ),
+        );
   }
-
-  // outputs
-  @override
-  ValueState<LookupData> get lookupState => _lookupState;
 
   // commands
   @override

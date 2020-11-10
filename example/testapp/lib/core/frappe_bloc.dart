@@ -1,17 +1,23 @@
 import 'package:frappe/frappe.dart';
 import 'package:meta/meta.dart';
 
-abstract class Bloc {}
+abstract class Bloc<S> {
+  ValueState<S> get state;
+}
 
-abstract class BaseBloc implements Bloc, Disposable {
+abstract class BaseBloc<S> implements Bloc<S>, Disposable {
+  late final ValueState<S> _state;
+
   final _disposableCollector = DisposableCollector();
 
   BaseBloc() {
-    runTransaction(create);
+    runTransaction(() {
+      _state = _registerValueState<S>(create());
+    });
   }
 
   @protected
-  void create();
+  ValueState<S> create();
 
   @protected
   EventStream<E> registerEventStream<E>(EventStream<E> eventStream) {
@@ -20,16 +26,17 @@ abstract class BaseBloc implements Bloc, Disposable {
     return eventStream;
   }
 
-  @protected
-  ValueState<V> registerValueState<V>(ValueState<V> valueState) {
-    _disposableCollector.add(valueState.toReference());
-
-    return valueState;
-  }
-
   @mustCallSuper
   @override
   void dispose() {
     _disposableCollector.dispose();
+  }
+
+  ValueState<S> get state => _state;
+
+  ValueState<V> _registerValueState<V>(ValueState<V> valueState) {
+    _disposableCollector.add(valueState.toReference());
+
+    return valueState;
   }
 }
