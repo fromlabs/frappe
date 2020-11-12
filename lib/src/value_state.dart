@@ -258,18 +258,20 @@ class ValueState<V> extends FrappeObject<V> {
             (iterator..moveNext()).current);
       });
 
-  ListenSubscription listen(ValueHandler<V> onValue) =>
-      Transaction.run((transaction) => toValues().listen(onValue));
-
-  ValueState<V> addReferencedSubscription(ListenSubscription subscription) =>
-      Transaction.runRequired((_) => ValueState._(
-          _currentLazyValue, _stream.addReferencedSubscription(subscription)));
+  ListenSubscription listen(ValueHandler<V> onValue,
+          {bool createReference = true}) =>
+      Transaction.run((transaction) =>
+          toValues().listen(onValue, createReference: createReference));
 
   ValueState<VR> switchMapState<VR>(Mapper<V, ValueState<VR>> mapper) =>
       ValueState.switchState<VR>(map<ValueState<VR>>(mapper));
 
   EventStream<ER> switchMapStream<ER>(Mapper<V, EventStream<ER>> mapper) =>
       ValueState.switchStream<ER>(map<EventStream<ER>>(mapper));
+
+  ValueState<V> linkObject(FrappeObject linkedObject) =>
+      Transaction.runRequired((_) =>
+          ValueState._(_currentLazyValue, _stream.linkObject(linkedObject)));
 
   Node<V> get _node => _stream.node;
 

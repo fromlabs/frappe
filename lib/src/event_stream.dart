@@ -287,30 +287,20 @@ class EventStream<E> extends FrappeObject<E> {
         }
       });
 
-  ListenSubscription listenOnce(ValueHandler<E> onEvent) {
+  ListenSubscription listenOnce(ValueHandler<E> onEvent,
+      {bool createReference = true}) {
     late final ListenSubscription listenSubscription;
 
     listenSubscription = listen((data) {
       listenSubscription.cancel();
 
       onEvent(data);
-    });
+    }, createReference: createReference);
 
     return listenSubscription;
   }
 
-  EventStream<E> addReferencedSubscription(ListenSubscription subscription) =>
-      Transaction.runRequired((transaction) {
-        final targetNode = KeyNode<E>(
-            evaluateHandler: _defaultEvaluateHandler,
-            unreferencedHandler: subscription.cancel);
-
-        targetNode.link(_node);
-
-        return EventStream._(targetNode);
-      });
-
-  EventStream<E> linkEventStream(EventStream<Object> linkedEventStream) =>
+  EventStream<E> linkObject(FrappeObject linkedObject) =>
       Transaction.runRequired((transaction) {
         const linked = 'linked';
 
@@ -320,7 +310,11 @@ class EventStream<E> extends FrappeObject<E> {
         );
 
         targetNode.link(_node);
-        targetNode.link(linkedEventStream._node, key: linked);
+        if (linkedObject is EventStream) {
+          targetNode.link(linkedObject.node, key: linked);
+        } else if (linkedObject is ValueState) {
+          targetNode.link(linkedObject.node, key: linked);
+        }
 
         return EventStream._(targetNode);
       });
