@@ -12,12 +12,12 @@ abstract class BaseBloc<S> implements Bloc<S>, Disposable {
 
   BaseBloc() {
     runTransaction(() {
-      _state = _registerValueState<S>(create());
+      _state = _registerValueState<S>(init());
     });
   }
 
   @protected
-  ValueState<S> create();
+  ValueState<S> init();
 
   @protected
   EventStream<E> registerEventStream<E>(EventStream<E> eventStream) {

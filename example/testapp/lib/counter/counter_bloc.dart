@@ -5,7 +5,7 @@ class CounterBloc extends BaseBloc<int> {
   late final EventStreamSink<Unit> _incrementSink;
 
   @override
-  ValueState<int> create() {
+  ValueState<int> init() {
     _incrementSink = EventStreamSink<Unit>();
 
     final stateLink = ValueStateLink<int>();

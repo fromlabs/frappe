@@ -19,7 +19,7 @@ class KeypadBlocImpl extends BaseBloc<int> implements KeypadBloc {
   late final EventStream<Unit> _beepStream;
 
   @override
-  ValueState<int> create() {
+  ValueState<int> init() {
     _keypadSink = EventStreamSink<NumericKey>();
 
     final _keypadFlutOutput = keypadFlut(keypadStream: _keypadSink.stream);

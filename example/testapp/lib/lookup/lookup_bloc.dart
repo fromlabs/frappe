@@ -26,7 +26,7 @@ class LookupBlocImpl extends BaseBloc<LookupData> implements LookupBloc {
   late final EventStreamSink<String> _lookupSink;
 
   @override
-  ValueState<LookupData> create() {
+  ValueState<LookupData> init() {
     _lookupSink = EventStreamSink<String>();
 
     final _isBusyFlutOutput = isBusyFlut<String, String?>(
