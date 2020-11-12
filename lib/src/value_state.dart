@@ -114,8 +114,8 @@ class ValueState<V> extends FrappeObject<V> {
             evaluateHandler: (inputs) => NodeEvaluation(
                   combiner(Map.fromIterables(states, inputs.evaluations)
                       .entries
-                      .map((entry) => entry.value.isEvaluated
-                          ? entry.value.value
+                      .map((entry) => (entry.value?.isEvaluated ?? false)
+                          ? entry.value!.value
                           : entry.key.getValue())),
                 ));
 

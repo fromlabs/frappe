@@ -44,11 +44,7 @@ class _NotNodeEvaluation<S> implements NodeEvaluation<S> {
   @override
   final bool isEvaluated = false;
 
-  _NotNodeEvaluation() {
-    if (runtimeType.toString() == '_NotNodeEvaluation<dynamic>') {
-      throw Error();
-    }
-  }
+  const _NotNodeEvaluation();
 
   @override
   bool get isNotEvaluated => !isEvaluated;
