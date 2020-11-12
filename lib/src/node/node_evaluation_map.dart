@@ -11,10 +11,10 @@ class NodeEvaluationMap extends NodeEvaluationCollection {
             .map((entry) => entry.value)
             .every((evaluation) => evaluation.isEvaluated));
 
-  NodeEvaluation get evaluation => get(defaultEvaluationKey);
+  // NodeEvaluation get evaluation => get(defaultEvaluationKey);
 
-  NodeEvaluation operator [](key) => get(key);
+  // NodeEvaluation operator [](key) => get(key);
 
-  NodeEvaluation<V> get<V>(key) =>
-      (evaluations[key] ?? NodeEvaluation.not()) as NodeEvaluation<V>;
+  NodeEvaluation<V> get<V>([key = defaultEvaluationKey]) =>
+      (evaluations[key] ?? NodeEvaluation<V>.not()) as NodeEvaluation<V>;
 }

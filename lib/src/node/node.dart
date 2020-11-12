@@ -235,11 +235,9 @@ class IndexNode<S> extends Node<S> {
   @override
   NodeEvaluationList createEvaluationInputs(
           Iterable<MapEntry<dynamic, NodeEvaluation?>> inputEntries) =>
-      NodeEvaluationList(inputEntries.map((entry) => MapEntry(
-          entry.key,
-          entry.value != null
-              ? entry.value as NodeEvaluation
-              : NodeEvaluation.not())));
+      NodeEvaluationList(inputEntries
+          .whereType<MapEntry<dynamic, NodeEvaluation>>()
+          .map((entry) => MapEntry(entry.key, entry.value)));
 
   @override
   NodeEvaluation<S> evaluate(NodeEvaluationList inputs) =>
@@ -297,11 +295,9 @@ class KeyNode<S> extends Node<S> {
   @override
   NodeEvaluationMap createEvaluationInputs(
           Iterable<MapEntry<dynamic, NodeEvaluation?>> inputEntries) =>
-      NodeEvaluationMap(inputEntries.map((entry) => MapEntry(
-          entry.key,
-          entry.value != null
-              ? entry.value as NodeEvaluation
-              : NodeEvaluation.not())));
+      NodeEvaluationMap(inputEntries
+          .whereType<MapEntry<dynamic, NodeEvaluation>>()
+          .map((entry) => MapEntry(entry.key, entry.value)));
 
   @override
   NodeEvaluation<S> evaluate(NodeEvaluationMap inputs) =>

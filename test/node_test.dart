@@ -284,7 +284,7 @@ void main() {
       final node2 = KeyNode<int>(
           debugLabel: 'DUPLIFY',
           evaluateHandler: (inputs) =>
-              NodeEvaluation(2 * inputs.evaluation.value as int));
+              NodeEvaluation(2 * inputs.get<int>().value));
 
       node2.link(node1);
 
@@ -318,21 +318,21 @@ void main() {
       final node21 = KeyNode<int>(
           debugLabel: 'DUPLIFY1',
           evaluateHandler: (inputs) =>
-              NodeEvaluation(2 * inputs.evaluation.value as int))
+              NodeEvaluation(2 * inputs.get<int>().value))
         ..link(input1);
 
       final node22 = KeyNode<int>(
           debugLabel: 'TRIPLIFY2',
           evaluateHandler: (inputs) =>
-              NodeEvaluation(3 * inputs.evaluation.value as int))
+              NodeEvaluation(3 * inputs.get<int>().value))
         ..link(input2);
 
       final merge2 = KeyNode<int>(
         debugLabel: 'MERGE2',
         evaluationType: EvaluationType.almostOneInput,
-        evaluateHandler: (inputs) => (inputs[0].isEvaluated
-            ? inputs[0]
-            : inputs[1]) as NodeEvaluation<int>,
+        evaluateHandler: (inputs) => inputs.get<int>(0).isEvaluated
+            ? inputs.get<int>(0)
+            : inputs.get<int>(1),
       )
         ..link(input3, key: 0)
         ..link(node22, key: 1);
@@ -340,7 +340,7 @@ void main() {
       final node32 = KeyNode<int>(
           debugLabel: 'TRIPLIFY3',
           evaluateHandler: (inputs) =>
-              NodeEvaluation(3 * inputs.evaluation.value as int))
+              NodeEvaluation(3 * inputs.get<int>().value))
         ..link(merge2);
 
       // ignore: unused_local_variable
@@ -348,9 +348,9 @@ void main() {
       final merge1 = KeyNode<int>(
         debugLabel: 'MERGE1',
         evaluationType: EvaluationType.almostOneInput,
-        evaluateHandler: (inputs) => (inputs[0].isEvaluated
-            ? inputs[0]
-            : inputs[1]) as NodeEvaluation<int>,
+        evaluateHandler: (inputs) => inputs.get<int>(0).isEvaluated
+            ? inputs.get<int>(0)
+            : inputs.get<int>(1),
         commitHandler: (value) => merge1Value = value,
       )
         ..link(node32, key: 0)
@@ -359,17 +359,16 @@ void main() {
       var previousEvaluation = NodeEvaluation<int>.not();
       final distinct = KeyNode<int>(
         debugLabel: 'DISTINCT',
-        evaluateHandler: (inputs) => (previousEvaluation.isNotEvaluated ||
-                inputs.evaluation.value != previousEvaluation.value
-            ? inputs.evaluation
-            : NodeEvaluation<int>.not()) as NodeEvaluation<int>,
-        commitHandler: (value) =>
-            previousEvaluation = NodeEvaluation<int>(value),
+        evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
+                inputs.get<int>().value != previousEvaluation.value
+            ? inputs.get<int>()
+            : NodeEvaluation<int>.not(),
+        commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
       )..link(merge1);
 
       final listen = KeyNode<int>(
         debugLabel: 'LISTEN',
-        evaluateHandler: (inputs) => inputs.evaluation as NodeEvaluation<int>,
+        evaluateHandler: (inputs) => inputs.get<int>(),
         commitHandler: commits.add,
         publishHandler: publishs.add,
       )..link(distinct);

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:frappe/src/disposable.dart';
-import 'package:frappe/src/value_state.dart';
 
 class DisposableCollector implements Disposable {
   final _disposables = <Disposable>[];

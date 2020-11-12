@@ -15,7 +15,7 @@ ValueState<V> createValueState<V>(
     ValueState._(lazyInitValue, stream);
 
 NodeEvaluation<V> _defaultEvaluateHandler<V>(NodeEvaluationMap inputs) =>
-    inputs.evaluation as NodeEvaluation<V>;
+    inputs.get<V>();
 
 class ValueStateSink<V> {
   final ValueState<V> state;
@@ -177,9 +177,9 @@ class ValueState<V> extends FrappeObject<V> {
   EventStream<V> toValues() => Transaction.runRequired((transaction) {
         final targetNode = KeyNode<V>(
             evaluationType: EvaluationType.always,
-            evaluateHandler: (inputs) => inputs.evaluation.isEvaluated
-                ? inputs.evaluation as NodeEvaluation<V>
-                : NodeEvaluation<V>(getValue()));
+            evaluateHandler: (inputs) => inputs.get<V>().isEvaluated
+                ? inputs.get<V>()
+                : NodeEvaluation(getValue()));
 
         Transaction.addClosingTransactionHandler(targetNode, (transaction) {
           targetNode.evaluationType = EvaluationType.allInputs;

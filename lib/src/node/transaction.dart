@@ -4,7 +4,6 @@ import 'dart:collection';
 import 'package:frappe/src/node/node.dart';
 import 'package:frappe/src/node/node_evaluation.dart';
 import 'package:frappe/src/reference.dart';
-import 'package:frappe/src/transaction.dart';
 
 typedef TransactionHandler = void Function(Transaction transaction);
 typedef TransactionRunner<T> = T Function(Transaction transaction);

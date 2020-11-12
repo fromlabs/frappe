@@ -22,8 +22,9 @@ Merger<E> _defaultSinkMergerFactory<E>() =>
 
 Merger<E> _defaultMergerFactory<E>() => (E value1, E value2) => value1;
 
+// FIXME roby: verificare chi lo utilizza
 NodeEvaluation<E> _defaultEvaluateHandler<E>(NodeEvaluationMap inputs) =>
-    inputs.evaluation as NodeEvaluation<E>;
+    inputs.get<E>();
 
 class EventStreamSink<E> {
   final EventStream<E> stream;
@@ -116,13 +117,13 @@ class EventStream<E> extends FrappeObject<E> {
     final targetNode = KeyNode<E>(
       evaluationType: EvaluationType.almostOneInput,
       evaluateHandler: (inputs) {
-        if (inputs[input1].isNotEvaluated) {
-          return inputs[input2] as NodeEvaluation<E>;
-        } else if (inputs[input2].isEvaluated) {
+        if (inputs.get<E>(input1).isNotEvaluated) {
+          return inputs.get<E>(input2);
+        } else if (inputs.get<E>(input2).isEvaluated) {
           return NodeEvaluation<E>(
-              merger(inputs[input1].value, inputs[input2].value));
+              merger(inputs.get<E>(input1).value, inputs.get<E>(input2).value));
         } else {
-          return inputs[input1] as NodeEvaluation<E>;
+          return inputs.get<E>(input1);
         }
       },
     );
@@ -165,8 +166,8 @@ class EventStream<E> extends FrappeObject<E> {
       var previousEvaluation = NodeEvaluation<E>.not();
       final targetNode = KeyNode<E>(
         evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
-                !equals(inputs.evaluation.value, previousEvaluation.value)
-            ? inputs.evaluation as NodeEvaluation<E>
+                !equals(inputs.get<E>().value, previousEvaluation.value)
+            ? inputs.get<E>()
             : NodeEvaluation<E>.not(),
         commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
       );
@@ -181,7 +182,7 @@ class EventStream<E> extends FrappeObject<E> {
       Transaction.runRequired((transaction) {
         final targetNode = KeyNode<ER>(
             evaluateHandler: (inputs) =>
-                NodeEvaluation<ER>(mapper.call(inputs.evaluation.value)));
+                NodeEvaluation<ER>(mapper.call(inputs.get<E>().value)));
 
         targetNode.link(_node);
 
@@ -201,8 +202,8 @@ class EventStream<E> extends FrappeObject<E> {
   EventStream<E> where(Filter<E> filter) =>
       Transaction.runRequired((transaction) {
         final targetNode = KeyNode<E>(
-          evaluateHandler: (inputs) => filter(inputs.evaluation.value)
-              ? inputs.evaluation as NodeEvaluation<E>
+          evaluateHandler: (inputs) => filter(inputs.get<E>().value)
+              ? inputs.get<E>()
               : NodeEvaluation<E>.not(),
         );
 
@@ -269,7 +270,8 @@ class EventStream<E> extends FrappeObject<E> {
         return stream;
       });
 
-  ListenSubscription listen(ValueHandler<E> onEvent) =>
+  ListenSubscription listen(ValueHandler<E> onEvent,
+          {bool createReference = true}) =>
       Transaction.run((transaction) {
         final listenNode = KeyNode<E>(
           evaluateHandler: _defaultEvaluateHandler,
@@ -278,7 +280,11 @@ class EventStream<E> extends FrappeObject<E> {
 
         listenNode.link(_node);
 
-        return _ReferenceListenSubscription(Reference(listenNode));
+        if (createReference) {
+          return _ReferenceListenSubscription(Reference(listenNode));
+        } else {
+          return _CancelerListenSubscription(listenNode.unlink);
+        }
       });
 
   ListenSubscription listenOnce(ValueHandler<E> onEvent) {
@@ -300,6 +306,21 @@ class EventStream<E> extends FrappeObject<E> {
             unreferencedHandler: subscription.cancel);
 
         targetNode.link(_node);
+
+        return EventStream._(targetNode);
+      });
+
+  EventStream<E> linkEventStream(EventStream<Object> linkedEventStream) =>
+      Transaction.runRequired((transaction) {
+        const linked = 'linked';
+
+        final targetNode = KeyNode<E>(
+          evaluationType: EvaluationType.almostOneInput,
+          evaluateHandler: _defaultEvaluateHandler,
+        );
+
+        targetNode.link(_node);
+        targetNode.link(linkedEventStream._node, key: linked);
 
         return EventStream._(targetNode);
       });
@@ -327,4 +348,13 @@ class _ReferenceListenSubscription extends ListenSubscription {
 
   @override
   void cancel() => _reference.dispose();
+}
+
+class _CancelerListenSubscription extends ListenSubscription {
+  final void Function() _canceler;
+
+  _CancelerListenSubscription(this._canceler);
+
+  @override
+  void cancel() => _canceler();
 }
