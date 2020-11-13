@@ -270,8 +270,7 @@ class EventStream<E> extends FrappeObject<E> {
         return stream;
       });
 
-  ListenSubscription listen(ValueHandler<E> onEvent,
-          {bool createReference = true}) =>
+  ListenSubscription listen(ValueHandler<E> onEvent) =>
       Transaction.run((transaction) {
         final listenNode = KeyNode<E>(
           evaluateHandler: _defaultEvaluateHandler,
@@ -280,41 +279,29 @@ class EventStream<E> extends FrappeObject<E> {
 
         listenNode.link(_node);
 
-        if (createReference) {
-          return _ReferenceListenSubscription(Reference(listenNode));
-        } else {
-          return _CancelerListenSubscription(listenNode.unlink);
-        }
+        return _ReferenceListenSubscription(Reference(listenNode));
       });
 
-  ListenSubscription listenOnce(ValueHandler<E> onEvent,
-      {bool createReference = true}) {
+  ListenSubscription listenOnce(ValueHandler<E> onEvent) {
     late final ListenSubscription listenSubscription;
 
     listenSubscription = listen((data) {
       listenSubscription.cancel();
 
       onEvent(data);
-    }, createReference: createReference);
+    });
 
     return listenSubscription;
   }
 
-  EventStream<E> linkObject(FrappeObject linkedObject) =>
+  EventStream<E> addListenSubscriptionCleaner(
+          ListenSubscription subscription) =>
       Transaction.runRequired((transaction) {
-        const linked = 'linked';
-
         final targetNode = KeyNode<E>(
-          evaluationType: EvaluationType.almostOneInput,
-          evaluateHandler: _defaultEvaluateHandler,
-        );
+            evaluateHandler: _defaultEvaluateHandler,
+            unreferencedHandler: subscription.cancel);
 
         targetNode.link(_node);
-        if (linkedObject is EventStream) {
-          targetNode.link(linkedObject.node, key: linked);
-        } else if (linkedObject is ValueState) {
-          targetNode.link(linkedObject.node, key: linked);
-        }
 
         return EventStream._(targetNode);
       });
@@ -342,13 +329,4 @@ class _ReferenceListenSubscription extends ListenSubscription {
 
   @override
   void cancel() => _reference.dispose();
-}
-
-class _CancelerListenSubscription extends ListenSubscription {
-  final void Function() _canceler;
-
-  _CancelerListenSubscription(this._canceler);
-
-  @override
-  void cancel() => _canceler();
 }

@@ -192,12 +192,14 @@ class IndexNode<S> extends Node<S> {
     IndexNodeEvaluator<S>? evaluateHandler,
     ValueHandler<S>? commitHandler,
     ValueHandler<S>? publishHandler,
+    Handler? unreferencedHandler,
   })  : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler,
         super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
+          unreferencedHandler: unreferencedHandler,
         );
 
   static NodeEvaluation<S> _missingEvaluateHandler<S>(
@@ -249,12 +251,14 @@ class KeyNode<S> extends Node<S> {
     KeyNodeEvaluator<S>? evaluateHandler,
     ValueHandler<S>? commitHandler,
     ValueHandler<S>? publishHandler,
+    Handler? unreferencedHandler,
   })  : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler,
         super(
           debugLabel: debugLabel,
           evaluationType: evaluationType,
           commitHandler: commitHandler,
           publishHandler: publishHandler,
+          unreferencedHandler: unreferencedHandler,
         );
 
   static NodeEvaluation<S> _missingEvaluateHandler<S>(

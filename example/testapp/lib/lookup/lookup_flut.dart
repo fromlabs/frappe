@@ -15,7 +15,8 @@ LookupFlutOutput lookupFlut({
 }) {
   final definitionStreamSink = EventStreamSink<String?>();
 
-  wordStream.listen((word) async {
+  return LookupFlutOutput(definitionStream: definitionStreamSink.stream
+      .addListenSubscriptionCleaner(wordStream.listen((word) async {
     try {
       final definition = await lookupIo.call(word);
 
@@ -25,8 +26,5 @@ LookupFlutOutput lookupFlut({
 
       definitionStreamSink.sendNull();
     }
-  }, createReference: false);
-
-  return LookupFlutOutput(
-      definitionStream: definitionStreamSink.stream.linkObject(wordStream));
+  })));
 }

@@ -10,14 +10,13 @@ void main() {
 
     final outputSink = EventStreamSink<int>();
 
-    inputSink.stream.listen((value) {
+    final subscription = inputSink.stream.listen((value) {
       print('value: $value');
+    });
 
-      outputSink.send(value);
-    }, createReference: false);
-
-    streamReference =
-        outputSink.stream.linkObject(inputSink.stream).toReference();
+    streamReference = outputSink.stream
+        .addListenSubscriptionCleaner(subscription)
+        .toReference();
   });
 
   inputSink.send(1);
