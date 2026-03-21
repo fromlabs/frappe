@@ -233,9 +233,6 @@ class EventStream<E> {
   EventStream<ER> whereType<ER>() =>
       Transaction.runRequired((_) => where((event) => event is ER).cast<ER>());
 
-  /// Filters out null values from a nullable event stream.
-  EventStream<E> mapWhereNotNull() => where((e) => e != null);
-
   /// Accumulates a state over events.
   ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) =>
       Transaction.runRequired((_) {
