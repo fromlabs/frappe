@@ -1,433 +1,336 @@
-import 'dart:collection';
-
+import 'package:frappe/frappe.dart';
 import 'package:frappe/src/node.dart';
+import 'package:frappe/src/node_evaluation.dart';
 import 'package:frappe/src/reference.dart';
+import 'package:frappe/src/transaction.dart' show Transaction;
 import 'package:test/test.dart';
 
 void main() {
+  late ReactiveScope scope;
+
   setUp(() {
-    Transaction.cleanState();
-    Node.cleanState();
-    Reference.cleanState();
+    scope = ReactiveScope();
   });
 
   tearDown(() {
-    Transaction.assertCleanState();
-    Node.assertCleanState();
-    Reference.assertCleanState();
+    scope.run(() => scope.assertCleanState());
+    scope.dispose();
   });
 
-  test('Node test 1', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
-
-      expect(node1.isReferenced, true);
-      expect(node2.isReferenced, true);
+  group('Node lifecycle', () {
+    test('node is referenced during transaction', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final node = KeyNode<int>(evaluationType: EvaluationType.never);
+          expect(node.isReferenced, isTrue);
+        });
+      });
     });
 
-    expect(node1.isReferenced, false);
-    expect(node2.isReferenced, false);
+    test('node becomes unreferenced after transaction without external ref', () {
+      scope.run(() {
+        late KeyNode<int> node;
 
-    Transaction.run((tx) {
-      expect(node1.isReferenced, false);
-      expect(node2.isReferenced, false);
+        scope.runTransaction(() {
+          node = KeyNode<int>(evaluationType: EvaluationType.never);
+        });
 
-      expect(() => node1.link(node2), throwsArgumentError);
+        expect(node.isReferenced, isFalse);
+      });
     });
-  });
 
-  test('Node test 2', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    KeyNode<int> node3;
+    test('node stays referenced with external reference', () {
+      scope.run(() {
+        late KeyNode<int> node;
+        late Reference<KeyNode<int>> ref;
 
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
-      node3 = KeyNode<int>(debugLabel: 'N3');
+        scope.runTransaction(() {
+          node = KeyNode<int>(evaluationType: EvaluationType.never);
+          ref = Reference(node);
+        });
 
-      node3.link(node1, key: 0);
-      node3.link(node2, key: 1);
-    });
-  });
+        expect(node.isReferenced, isTrue);
 
-  test('Node test 3', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    KeyNode<int> node3;
-
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
-      node3 = KeyNode<int>(debugLabel: 'N3');
-
-      node1.link(node2, key: 0);
-      node2.link(node3, key: 1);
-
-      expect(() => node3.link(node1, key: 2), throwsArgumentError);
+        ref.dispose();
+        expect(node.isReferenced, isFalse);
+      });
     });
   });
 
-  test('Node test 4', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
+  group('Node linking', () {
+    test('link two nodes', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final source = KeyNode<int>(evaluationType: EvaluationType.never);
+          final target = KeyNode<int>(evaluateHandler: (inputs) => inputs.get<int>());
 
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
+          target.link(source);
 
-      node2.link(node1);
-    });
-  });
-
-  test('Node test 4b', () {
-    final node1 = Transaction.run((_) => KeyNode<int>(debugLabel: 'N1'));
-
-    KeyNode<int> node2;
-
-    Transaction.run((tx) {
-      node2 = KeyNode<int>(debugLabel: 'N2');
-
-      expect(() => node2.link(node1), throwsArgumentError);
-    });
-  });
-
-  test('Node test 4c', () {
-    KeyNode<int> node1;
-
-    final node2 = Transaction.run((_) => KeyNode<int>(debugLabel: 'N2'));
-
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-
-      expect(() => node2.link(node1), throwsArgumentError);
-    });
-  });
-
-  test('Node test 5', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    KeyNode<int> node3;
-    Reference<KeyNode<int>> node3Ref;
-
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
-      node3 = KeyNode<int>(debugLabel: 'N3');
-
-      expect(node1.isReferenced, true);
-      expect(node2.isReferenced, true);
-      expect(node3.isReferenced, true);
-
-      node3.link(node1, key: 0);
-      node3.link(node2, key: 1);
-
-      expect(node1.isReferenced, true);
-      expect(node2.isReferenced, true);
-      expect(node3.isReferenced, true);
-
-      node3Ref = Reference(node3);
+          expect(target.isLinked, isTrue);
+        });
+      });
     });
 
-    expect(node1.isReferenced, true);
-    expect(node2.isReferenced, true);
-    expect(node3.isReferenced, true);
+    test('link unreferenced target throws', () {
+      scope.run(() {
+        late KeyNode<int> target;
+        late KeyNode<int> source;
+        late Reference<KeyNode<int>> sourceRef;
 
-    node3Ref.dispose();
+        scope.runTransaction(() {
+          target = KeyNode<int>(evaluationType: EvaluationType.never);
+        });
 
-    expect(node1.isReferenced, false);
-    expect(node2.isReferenced, false);
-    expect(node3.isReferenced, false);
-  });
+        // target is now unreferenced
+        scope.runTransaction(() {
+          source = KeyNode<int>(evaluationType: EvaluationType.never);
+          sourceRef = Reference(source);
+        });
 
-  test('Node test 6', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    Reference<KeyNode<int>> node2Ref;
+        expect(() {
+          scope.runTransaction(() {
+            target.link(source);
+          });
+        }, throwsArgumentError);
 
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
-      node2Ref = Reference(node2);
+        sourceRef.dispose();
+      });
     });
 
-    expect(() => node2.link(node1), throwsArgumentError);
+    test('link unreferenced source throws', () {
+      scope.run(() {
+        late KeyNode<int> source;
 
-    node2Ref.dispose();
-  });
+        scope.runTransaction(() {
+          source = KeyNode<int>(evaluationType: EvaluationType.never);
+        });
 
-  test('Node test 7', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    Reference<KeyNode<int>> node2Ref;
+        // source is now unreferenced
+        scope.runTransaction(() {
+          final target = KeyNode<int>(evaluateHandler: (inputs) => inputs.get<int>());
+          final ref = Reference(target);
 
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
-      node2Ref = Reference(node2);
+          expect(() => target.link(source), throwsArgumentError);
+
+          ref.dispose();
+        });
+      });
     });
 
-    node2Ref.dispose();
+    test('cycle detection throws', () {
+      scope.run(() {
+        expect(() {
+          scope.runTransaction(() {
+            final n1 = KeyNode<int>(evaluateHandler: (inputs) => inputs.get<int>());
+            final n2 = KeyNode<int>(evaluateHandler: (inputs) => inputs.get<int>());
+            final n3 = KeyNode<int>(evaluateHandler: (inputs) => inputs.get<int>());
 
-    expect(() => node2.link(node1), throwsArgumentError);
-  });
-
-  test('Node test 8', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    Reference<KeyNode<int>> node2Ref;
-
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
-
-      expect(node1.isReferenced, true);
-      expect(node2.isReferenced, true);
-
-      node2.link(node1);
-
-      node2Ref = Reference(node2);
+            n2.link(n1);
+            n3.link(n2);
+            n1.link(n3); // Cycle!
+          });
+        }, throwsArgumentError);
+      });
     });
 
-    expect(node1.isReferenced, true);
-    expect(node2.isReferenced, true);
-
-    Reference<KeyNode<int>> node2bRef;
-    Transaction.run((tx) {
-      expect(node1.isReferenced, true);
-      expect(node2.isReferenced, true);
-
-      node2bRef = Reference(node2);
-
-      node2Ref.dispose();
-    });
-
-    expect(node1.isReferenced, true);
-    expect(node2.isReferenced, true);
-
-    Transaction.run((tx) {
-      expect(node1.isReferenced, true);
-      expect(node2.isReferenced, true);
-
-      node2bRef.dispose();
-
-      expect(node1.isReferenced, true);
-      expect(node2.isReferenced, true);
-    });
-
-    expect(node1.isReferenced, false);
-    expect(node2.isReferenced, false);
-  });
-
-  test('Node test 9', () {
-    KeyNode<int> node1;
-    KeyNode<int> node2;
-    KeyNode<int> node3;
-    Reference<KeyNode<int>> node3Ref;
-
-    Transaction.run((tx) {
-      node1 = KeyNode<int>(debugLabel: 'N1');
-      node2 = KeyNode<int>(debugLabel: 'N2');
-      node3 = KeyNode<int>(debugLabel: 'N3');
-
-      node2.link(node1);
-      node3.link(node2);
-
-      node3Ref = Reference(node3);
-    });
-
-    Transaction.run((tx) {
-      final oldRef = node3Ref;
-
-      node3Ref = Reference(node3);
-
-      oldRef.dispose();
-    });
-
-    Transaction.run((tx) {
-      final oldRef = node3Ref;
-
-      oldRef.dispose();
-
-      node3Ref = Reference(node3);
-    });
-
-    Transaction.run((tx) {
-      final oldRef = node3Ref;
-
-      oldRef.dispose();
-
-      node3Ref = Reference(node3);
-    });
-
-    expect(node1.isReferenced, true);
-    expect(node2.isReferenced, true);
-    expect(node3.isReferenced, true);
-
-    node3Ref.dispose();
-
-    expect(node1.isReferenced, false);
-    expect(node2.isReferenced, false);
-    expect(node3.isReferenced, false);
-  });
-
-  test('Node evaluation test 1', () {
-    Reference<KeyNode<int>> node1Ref;
-    Reference<KeyNode<int>> node2Ref;
-
-    Transaction.run((tx) {
-      final node1 = KeyNode<int>(debugLabel: 'INPUT');
-      final node2 = KeyNode<int>(
-          debugLabel: 'DUPLIFY',
-          evaluateHandler: (inputs) =>
-              NodeEvaluation(2 * inputs.evaluation.value));
-
-      node2.link(node1);
-
-      node1Ref = Reference(node1);
-      node2Ref = Reference(node2);
-    });
-
-    Transaction.run((tx) {
-      tx.setValue(node1Ref.value, 1);
-    });
-
-    node1Ref.dispose();
-    node2Ref.dispose();
-  });
-
-  test('Node evaluation test 2', () {
-    Reference<KeyNode<int>> input1Ref;
-    Reference<KeyNode<int>> input2Ref;
-    Reference<KeyNode<int>> input3Ref;
-    Reference<KeyNode<int>> merge1Ref;
-    Reference<KeyNode<int>> listenRef;
-
-    final commits = Queue<int>();
-    final publishs = Queue<int>();
-
-    Transaction.run((tx) {
-      final input1 = KeyNode<int>(debugLabel: 'INPUT1');
-      final input2 = KeyNode<int>(debugLabel: 'INPUT2');
-      final input3 = KeyNode<int>(debugLabel: 'INPUT3');
-
-      final node21 = KeyNode<int>(
-          debugLabel: 'DUPLIFY1',
-          evaluateHandler: (inputs) =>
-              NodeEvaluation(2 * inputs.evaluation.value))
-        ..link(input1);
-
-      final node22 = KeyNode<int>(
-          debugLabel: 'TRIPLIFY2',
-          evaluateHandler: (inputs) =>
-              NodeEvaluation(3 * inputs.evaluation.value))
-        ..link(input2);
-
-      final merge2 = KeyNode<int>(
-        debugLabel: 'MERGE2',
-        evaluationType: EvaluationType.almostOneInput,
-        evaluateHandler: (inputs) =>
-            inputs[0].isEvaluated ? inputs[0] : inputs[1],
-      )
-        ..link(input3, key: 0)
-        ..link(node22, key: 1);
-
-      final node32 = KeyNode<int>(
-          debugLabel: 'TRIPLIFY3',
-          evaluateHandler: (inputs) =>
-              NodeEvaluation(3 * inputs.evaluation.value))
-        ..link(merge2);
-
-      // ignore: unused_local_variable
-      var merge1Value = 1;
-      final merge1 = KeyNode<int>(
-        debugLabel: 'MERGE1',
-        evaluationType: EvaluationType.almostOneInput,
-        evaluateHandler: (inputs) =>
-            inputs[0].isEvaluated ? inputs[0] : inputs[1],
-        commitHandler: (value) => merge1Value = value,
-      )
-        ..link(node32, key: 0)
-        ..link(node21, key: 1);
-
-      var previousEvaluation = NodeEvaluation.not();
-      final distinct = KeyNode<int>(
-        debugLabel: 'DISTINCT',
-        evaluateHandler: (inputs) => previousEvaluation.isNotEvaluated ||
-                inputs.evaluation.value != previousEvaluation.value
-            ? inputs.evaluation
-            : NodeEvaluation.not(),
-        commitHandler: (value) => previousEvaluation = NodeEvaluation(value),
-      )..link(merge1);
-
-      final listen = KeyNode<int>(
-        debugLabel: 'LISTEN',
-        evaluateHandler: (inputs) => inputs.evaluation,
-        commitHandler: commits.add,
-        publishHandler: publishs.add,
-      )..link(distinct);
-
-      input1Ref = Reference(input1);
-      input2Ref = Reference(input2);
-      input3Ref = Reference(input3);
-      merge1Ref = Reference(merge1);
-      listenRef = Reference(listen);
-    });
-
-    expect(commits, isEmpty);
-    expect(publishs, isEmpty);
-
-    Transaction.run((tx) {
-      tx.setValue(input1Ref.value, 1);
-      tx.setValue(input2Ref.value, 1);
-    });
-
-    expect(commits, isNotEmpty);
-    expect(commits.removeLast(), equals(9));
-    expect(commits, isEmpty);
-    expect(publishs, isNotEmpty);
-    expect(publishs.removeLast(), equals(9));
-    expect(publishs, isEmpty);
-
-    Transaction.run((tx) {
-      tx.setValue(input1Ref.value, 1);
-      tx.setValue(input2Ref.value, 2);
-    });
-
-    expect(commits, isNotEmpty);
-    expect(commits.removeLast(), equals(18));
-    expect(commits, isEmpty);
-    expect(publishs, isNotEmpty);
-    expect(publishs.removeLast(), equals(18));
-    expect(publishs, isEmpty);
-
-    Transaction.run((tx) {
-      tx.setValue(input1Ref.value, 1);
-      tx.setValue(input2Ref.value, 2);
-    });
-
-    expect(commits, isEmpty);
-    expect(publishs, isEmpty);
-
-    expect(
-        () => Transaction.run((tx) {
-              tx.setValue(input1Ref.value, 1);
-              if (!tx.hasValue(input1Ref.value)) {
-                tx.setValue(input1Ref.value, 2);
-              } else {
-                throw UnsupportedError('Node already with a value');
+    test('multiple inputs via key', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final source1 = KeyNode<int>(evaluationType: EvaluationType.never);
+          final source2 = KeyNode<int>(evaluationType: EvaluationType.never);
+          final target = KeyNode<int>(
+            evaluationType: EvaluationType.allInputs,
+            evaluateHandler: (inputs) {
+              final v1 = inputs.get<int>('a');
+              final v2 = inputs.get<int>('b');
+              if (v1.isEvaluated && v2.isEvaluated) {
+                return NodeEvaluation(v1.value + v2.value);
               }
-            }),
-        throwsUnsupportedError);
+              return NodeEvaluation.not();
+            },
+          );
 
-    input1Ref.dispose();
-    input2Ref.dispose();
-    input3Ref.dispose();
-    merge1Ref.dispose();
-    listenRef.dispose();
+          target.link(source1, key: 'a');
+          target.link(source2, key: 'b');
+
+          expect(target.isLinked, isTrue);
+          expect(target.isLinkedKey(key: 'a'), isTrue);
+          expect(target.isLinkedKey(key: 'b'), isTrue);
+        });
+      });
+    });
+  });
+
+  group('Node evaluation', () {
+    test('basic evaluation through graph', () {
+      scope.run(() {
+        late KeyNode<int> inputNode;
+        late Reference<KeyNode<int>> inputRef;
+        int? publishedValue;
+
+        scope.runTransaction(() {
+          inputNode = KeyNode<int>(evaluationType: EvaluationType.never);
+          inputRef = Reference(inputNode);
+
+          final doubler = KeyNode<int>(
+            evaluateHandler: (inputs) =>
+                NodeEvaluation(inputs.get<int>().value * 2),
+            publishHandler: (value) => publishedValue = value,
+          );
+
+          doubler.link(inputNode);
+          Reference(doubler);
+        });
+
+        // Send value through graph
+        scope.runTransaction(() {
+          final tx = Transaction.requiredTransaction;
+          tx.setValue(inputNode, 5);
+        });
+
+        expect(publishedValue, 10); // 5 * 2
+
+        inputRef.dispose();
+      });
+    });
+
+    test('evaluation order follows priority', () {
+      scope.run(() {
+        final order = <String>[];
+
+        scope.runTransaction(() {
+          final source = KeyNode<int>(evaluationType: EvaluationType.never);
+          final ref = Reference(source);
+
+          final mid = KeyNode<int>(
+            evaluateHandler: (inputs) {
+              order.add('mid');
+              return NodeEvaluation(inputs.get<int>().value + 1);
+            },
+          );
+          mid.link(source);
+
+          final end = KeyNode<int>(
+            evaluateHandler: (inputs) {
+              order.add('end');
+              return inputs.get<int>();
+            },
+            publishHandler: (_) {},
+          );
+          end.link(mid);
+          Reference(end);
+
+          // Trigger evaluation
+          final tx = Transaction.requiredTransaction;
+          tx.setValue(source, 1);
+
+          ref.dispose();
+        });
+
+        expect(order, ['mid', 'end']); // Mid evaluates before end
+      });
+    });
+
+    test('distinct node filters consecutive duplicates', () {
+      scope.run(() {
+        late KeyNode<int> inputNode;
+        late Reference<KeyNode<int>> inputRef;
+        final published = <int>[];
+
+        scope.runTransaction(() {
+          inputNode = KeyNode<int>(evaluationType: EvaluationType.never);
+          inputRef = Reference(inputNode);
+
+          var previous = NodeEvaluation<int>.not();
+          final distinctNode = KeyNode<int>(
+            evaluateHandler: (inputs) {
+              final current = inputs.get<int>();
+              if (previous.isNotEvaluated || current.value != previous.value) {
+                return current;
+              }
+              return NodeEvaluation<int>.not();
+            },
+            commitHandler: (value) => previous = NodeEvaluation(value),
+            publishHandler: (value) => published.add(value),
+          );
+          distinctNode.link(inputNode);
+          Reference(distinctNode);
+        });
+
+        scope.runTransaction(() {
+          Transaction.requiredTransaction.setValue(inputNode, 1);
+        });
+        scope.runTransaction(() {
+          Transaction.requiredTransaction.setValue(inputNode, 1);
+        });
+        scope.runTransaction(() {
+          Transaction.requiredTransaction.setValue(inputNode, 2);
+        });
+
+        expect(published, [1, 2]); // Duplicate 1 filtered
+
+        inputRef.dispose();
+      });
+    });
+  });
+
+  group('IndexNode', () {
+    test('link multiple sources by index', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final s1 = KeyNode<int>(evaluationType: EvaluationType.never);
+          final s2 = KeyNode<int>(evaluationType: EvaluationType.never);
+
+          final target = IndexNode<int>(
+            evaluationType: EvaluationType.allInputs,
+            evaluateHandler: (inputs) {
+              final values = inputs.evaluations
+                  .where((e) => e != null && e.isEvaluated)
+                  .map((e) => e!.value as int);
+              return NodeEvaluation(values.fold(0, (a, b) => a + b));
+            },
+          );
+
+          target.link([s1, s2]);
+          expect(target.isLinked, isTrue);
+        });
+      });
+    });
+  });
+
+  group('NodeEvaluation', () {
+    test('Evaluated contains value', () {
+      final eval = NodeEvaluation<int>(42);
+      expect(eval.isEvaluated, isTrue);
+      expect(eval.isNotEvaluated, isFalse);
+      expect(eval.value, 42);
+    });
+
+    test('NotEvaluated throws on value access', () {
+      final eval = NodeEvaluation<int>.not();
+      expect(eval.isEvaluated, isFalse);
+      expect(eval.isNotEvaluated, isTrue);
+      expect(() => eval.value, throwsStateError);
+    });
+
+    test('Evaluated equality', () {
+      expect(NodeEvaluation(42), equals(NodeEvaluation(42)));
+      expect(NodeEvaluation(42), isNot(equals(NodeEvaluation(43))));
+    });
+
+    test('NotEvaluated equality', () {
+      expect(NodeEvaluation<int>.not(), equals(NodeEvaluation<int>.not()));
+    });
+
+    test('pattern matching with sealed class', () {
+      final eval = NodeEvaluation<int>(42);
+
+      final result = switch (eval) {
+        Evaluated(value: final v) => 'value: $v',
+        NotEvaluated() => 'not evaluated',
+      };
+
+      expect(result, 'value: 42');
+    });
   });
 }

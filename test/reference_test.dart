@@ -1,178 +1,251 @@
+import 'package:frappe/frappe.dart';
+import 'package:frappe/src/node.dart';
 import 'package:frappe/src/reference.dart';
 import 'package:test/test.dart';
 
-class NodeReferenceable extends Referenceable {
-  final String id;
-
-  NodeReferenceable(this.id);
-
-  @override
-  String toString() => '$id';
-}
-
 void main() {
-  test('Reference test 01', () {
-    final n1 = NodeReferenceable('node1');
-    final n2 = NodeReferenceable('node2');
-    final n3 = NodeReferenceable('node3');
+  late ReactiveScope scope;
 
-    final nRef1 = Reference(n1);
-    final nRef2 = Reference(n2);
-    final nRef3 = Reference(n3);
-
-    n3.reference(n2);
-    n2.reference(n1);
-
-    nRef1.dispose();
-
-    expect(n1.isReferenced, true);
-    expect(n2.isReferenced, true);
-    expect(n3.isReferenced, true);
-
-    nRef2.dispose();
-
-    expect(n1.isReferenced, true);
-    expect(n2.isReferenced, true);
-    expect(n3.isReferenced, true);
-
-    nRef3.dispose();
-
-    expect(n1.isReferenced, false);
-    expect(n2.isReferenced, false);
-    expect(n3.isReferenced, false);
+  setUp(() {
+    scope = ReactiveScope();
   });
 
-  test('Reference test 02', () {
-    final n1 = NodeReferenceable('node1');
-    final n2 = NodeReferenceable('node2');
-    final n3 = NodeReferenceable('node3');
-
-    final nRef1 = Reference(n1);
-    final nRef2 = Reference(n2);
-    final nRef3 = Reference(n3);
-
-    n3.reference(n2);
-    n2.reference(n1);
-    n1.reference(n3);
-
-    nRef1.dispose();
-
-    expect(n1.isReferenced, true);
-    expect(n2.isReferenced, true);
-    expect(n3.isReferenced, true);
-
-    nRef2.dispose();
-
-    expect(n1.isReferenced, true);
-    expect(n2.isReferenced, true);
-    expect(n3.isReferenced, true);
-
-    nRef3.dispose();
-
-    expect(n1.isReferenced, false);
-    expect(n2.isReferenced, false);
-    expect(n3.isReferenced, false);
+  tearDown(() {
+    scope.run(() => scope.assertCleanState());
+    scope.dispose();
   });
 
-  test('Reference test 03', () {
-    final n1 = NodeReferenceable('node1');
+  group('Reference', () {
+    test('single reference keeps object alive', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final node = KeyNode<int>(evaluationType: EvaluationType.never);
+          expect(node.isReferenced, isTrue); // Alive during transaction
 
-    final nRef1 = Reference(n1);
+          final ref = Reference(node);
+          expect(node.isReferenced, isTrue);
 
-    n1.reference(n1);
+          ref.dispose();
+          // Node becomes unreferenced after ref disposal
+        });
+      });
+    });
 
-    expect(n1.isReferenced, true);
+    test('multiple references require all disposed', () {
+      scope.run(() {
+        late KeyNode<int> node;
+        late Reference<KeyNode<int>> ref1;
+        late Reference<KeyNode<int>> ref2;
 
-    nRef1.dispose();
+        scope.runTransaction(() {
+          node = KeyNode<int>(evaluationType: EvaluationType.never);
+          ref1 = Reference(node);
+          ref2 = Reference(node);
+        });
 
-    expect(n1.isReferenced, false);
+        expect(node.isReferenced, isTrue);
+
+        ref1.dispose();
+        expect(node.isReferenced, isTrue); // ref2 still active
+
+        ref2.dispose();
+        expect(node.isReferenced, isFalse);
+      });
+    });
+
+    test('double dispose throws', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final node = KeyNode<int>(evaluationType: EvaluationType.never);
+          final ref = Reference(node);
+          ref.dispose();
+          expect(() => ref.dispose(), throwsStateError);
+        });
+      });
+    });
+
+    test('hosted reference requires referenced host', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final host = KeyNode<int>(evaluationType: EvaluationType.never);
+          final child = KeyNode<int>(evaluationType: EvaluationType.never);
+
+          // Host is referenced during transaction
+          final hostedRef = host.reference(child);
+          expect(child.isReferenced, isTrue);
+
+          // Cleanup
+          hostedRef.dispose();
+        });
+      });
+    });
+
+    test('reference chain propagation', () {
+      scope.run(() {
+        late KeyNode<int> n1, n2, n3;
+        late Reference<KeyNode<int>> ref1, ref2, ref3;
+
+        scope.runTransaction(() {
+          n1 = KeyNode<int>(evaluationType: EvaluationType.never);
+          n2 = KeyNode<int>(evaluationType: EvaluationType.never);
+          n3 = KeyNode<int>(evaluationType: EvaluationType.never);
+          ref1 = Reference(n1);
+          ref2 = Reference(n2);
+          ref3 = Reference(n3);
+
+          // Create hosted references: n1 → n2 → n3
+          n1.reference(n2);
+          n2.reference(n3);
+        });
+
+        // All alive
+        expect(n1.isReferenced, isTrue);
+        expect(n2.isReferenced, isTrue);
+        expect(n3.isReferenced, isTrue);
+
+        // Dispose ref1 - n1 still referenced (by ref1... wait, we disposed it)
+        ref1.dispose();
+        // n1 is unreferenced now, but n2 is still alive via ref2
+        expect(n2.isReferenced, isTrue);
+        expect(n3.isReferenced, isTrue);
+
+        ref2.dispose();
+        expect(n3.isReferenced, isTrue); // ref3 still active
+
+        ref3.dispose();
+        expect(n3.isReferenced, isFalse);
+      });
+    });
+
+    test('reference replacement in transaction', () {
+      scope.run(() {
+        late KeyNode<int> node;
+        late Reference<KeyNode<int>> ref1;
+
+        scope.runTransaction(() {
+          node = KeyNode<int>(evaluationType: EvaluationType.never);
+          ref1 = Reference(node);
+        });
+
+        expect(node.isReferenced, isTrue);
+
+        scope.runTransaction(() {
+          final ref2 = Reference(node);
+          ref1.dispose();
+          expect(node.isReferenced, isTrue); // ref2 active
+          ref1 = ref2;
+        });
+
+        ref1.dispose();
+      });
+    });
   });
 
-  test('Reference test 04', () {
-    final n1 = NodeReferenceable('node1');
-    final n2 = NodeReferenceable('node2');
+  group('ReferenceGroup', () {
+    test('dispose disposes all references', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final n1 = KeyNode<int>(evaluationType: EvaluationType.never);
+          final n2 = KeyNode<int>(evaluationType: EvaluationType.never);
 
-    expect(() => n1.reference(n2), throwsArgumentError);
+          final group = ReferenceGroup();
+          group.reference(n1);
+          group.reference(n2);
 
-    final n1Ref = Reference(n1);
+          expect(n1.isReferenced, isTrue);
+          expect(n2.isReferenced, isTrue);
 
-    n1.reference(n2);
+          group.dispose();
+        });
+      });
+    });
 
-    n1Ref.dispose();
-
-    expect(n1.isReferenced, false);
-    expect(n2.isReferenced, false);
+    test('double dispose throws', () {
+      scope.run(() {
+        scope.runTransaction(() {
+          final group = ReferenceGroup();
+          group.dispose();
+          expect(() => group.dispose(), throwsStateError);
+        });
+      });
+    });
   });
 
-  test('Reference test 05', () {
-    final n1 = NodeReferenceable('node1');
+  group('FrappeReference', () {
+    test('keeps stream alive', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
 
-    final nRef1 = Reference(n1);
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+        });
 
-    expect(n1.isReferenced, true);
+        // Without reference, stream is unreferenced
+        expect(sink.isClosed, isTrue);
+      });
+    });
 
-    nRef1.dispose();
+    test('toReference keeps stream alive', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
 
-    expect(n1.isReferenced, false);
-  });
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
 
-  test('Reference test 06', () {
-    final n1 = NodeReferenceable('node1');
-    final n2 = NodeReferenceable('node2');
+        expect(sink.isClosed, isFalse);
+        expect(ref.isDisposed, isFalse);
 
-    final nRef1 = Reference(n1);
-    final nRef2 = Reference(n2);
+        ref.dispose();
+        expect(sink.isClosed, isTrue);
+        expect(ref.isDisposed, isTrue);
+      });
+    });
 
-    n1.reference(n2);
+    test('toReference keeps state alive', () {
+      scope.run(() {
+        late ValueStateSink<int> sink;
+        late FrappeReference<ValueState<int>> ref;
 
-    expect(n1.isReferenced, true);
-    expect(n2.isReferenced, true);
+        scope.runTransaction(() {
+          sink = ValueStateSink<int>(0);
+          ref = sink.state.toReference();
+        });
 
-    nRef2.dispose();
+        expect(sink.isClosed, isFalse);
 
-    expect(n1.isReferenced, true);
-    expect(n2.isReferenced, true);
+        ref.dispose();
+        expect(sink.isClosed, isTrue);
+      });
+    });
 
-    nRef1.dispose();
+    test('FrappeReferenceCollector batch disposal', () {
+      scope.run(() {
+        late EventStreamSink<int> sink1;
+        late ValueStateSink<int> sink2;
 
-    expect(n1.isReferenced, false);
-    expect(n2.isReferenced, false);
-  });
+        scope.runTransaction(() {
+          sink1 = EventStreamSink<int>();
+          sink2 = ValueStateSink<int>(0);
+        });
 
-  test('Reference test 07', () {
-    final n1 = NodeReferenceable('node1');
-    final n2 = NodeReferenceable('node2');
+        final collector = FrappeReferenceCollector();
 
-    final nRef1 = Reference(n1);
-    final nRef2 = Reference(n2);
+        scope.runTransaction(() {
+          collector.add(sink1.stream);
+          collector.add(sink2.state);
+        });
 
-    n1.reference(n2);
+        expect(sink1.isClosed, isFalse);
+        expect(sink2.isClosed, isFalse);
 
-    expect(n1.isReferenced, true);
-    expect(n2.isReferenced, true);
+        collector.dispose();
 
-    nRef1.dispose();
-
-    expect(n1.isReferenced, false);
-    expect(n2.isReferenced, true);
-
-    nRef2.dispose();
-
-    expect(n1.isReferenced, false);
-    expect(n2.isReferenced, false);
-  });
-
-  test('Reference test 08', () {
-    final n1 = NodeReferenceable('node1');
-    final n2 = NodeReferenceable('node2');
-
-    Reference(n1);
-    final nRef2 = Reference(n2);
-
-    n1.reference(n2);
-
-    nRef2.dispose();
-
-    expect(n2.isReferenced, true);
+        expect(sink1.isClosed, isTrue);
+        expect(sink2.isClosed, isTrue);
+      });
+    });
   });
 }

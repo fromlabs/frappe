@@ -1,5 +1,6 @@
-include: package:pedantic/analysis_options.yaml
+include: package:lints/recommended.yaml
 
-analyzer:
-  exclude:
-    - example/petrol_pump/**
+linter:
+  rules:
+    prefer_relative_imports: true
+    avoid_print: false

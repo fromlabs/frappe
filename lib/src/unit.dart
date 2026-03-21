@@ -1,3 +1,5 @@
-const unit = Unit._unit;
+/// A type with a single value, used to represent "no meaningful data".
+enum Unit { unit }
 
-enum Unit { _unit }
+/// The single value of [Unit].
+const unit = Unit.unit;
