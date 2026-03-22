@@ -1403,6 +1403,167 @@ void main() {
     });
   });
 
+  group('Dispose during transaction', () {
+    test('listener keeps stream alive after user reference disposed', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> sinkRef;
+
+        runTransaction(() {
+          sink = EventStreamSink<int>();
+          sinkRef = sink.stream.toReference();
+        });
+
+        final events = <int>[];
+        final sub = runTransaction(() => sink.stream.listen(events.add));
+
+        sink.send(1);
+        expect(events, [1]);
+
+        // Dispose user's reference — listener's internal reference
+        // keeps the stream node alive
+        sinkRef.dispose();
+        expect(sink.isClosed, isFalse);
+
+        sink.send(2);
+        expect(events, [1, 2]);
+
+        sub.cancel();
+      });
+    });
+
+    test('cancelling listener after user ref disposed cleans up fully', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> sinkRef;
+
+        runTransaction(() {
+          sink = EventStreamSink<int>();
+          sinkRef = sink.stream.toReference();
+        });
+
+        final sub = runTransaction(() => sink.stream.listen((_) {}));
+
+        // Dispose user ref first — stream stays alive via listener
+        sinkRef.dispose();
+        expect(sink.isClosed, isFalse);
+
+        // Cancel listener — now the stream is fully unreferenced
+        sub.cancel();
+        expect(sink.isClosed, isTrue);
+
+        // assertCleanState in tearDown verifies no dangling refs
+      });
+    });
+  });
+
+  group('Concurrent reference operations', () {
+    test('create and dispose references in same transaction', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref1;
+
+        runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref1 = sink.stream.toReference();
+        });
+
+        // In one transaction: create a second reference, dispose the first
+        runTransaction(() {
+          final ref2 = sink.stream.toReference();
+          ref1.dispose();
+          // Stream still alive via ref2
+          expect(sink.isClosed, isFalse);
+          ref1 = ref2; // Keep ref2 for cleanup
+        });
+
+        sink.send(42); // Still works
+        ref1.dispose();
+      });
+    });
+  });
+
+  group('switchMap disposal and switchMapState error', () {
+    test('switchMap inner stream is released on re-switch', () {
+      scope.run(() {
+        late EventStreamSink<int> selectorSink;
+        late EventStreamSink<String> innerSink1, innerSink2;
+        late FrappeReference<EventStream<int>> selectorRef;
+        late FrappeReference<EventStream<String>> innerRef1, innerRef2;
+
+        runTransaction(() {
+          selectorSink = EventStreamSink<int>();
+          innerSink1 = EventStreamSink<String>();
+          innerSink2 = EventStreamSink<String>();
+          selectorRef = selectorSink.stream.toReference();
+          innerRef1 = innerSink1.stream.toReference();
+          innerRef2 = innerSink2.stream.toReference();
+        });
+
+        final events = <String>[];
+        final sub = runTransaction(() => selectorSink.stream
+            .switchMap((i) => i == 0 ? innerSink1.stream : innerSink2.stream)
+            .listen(events.add));
+
+        // Switch to inner1
+        selectorSink.send(0);
+        innerSink1.send('a');
+        expect(events, ['a']);
+
+        // Switch to inner2 — inner1 is no longer listened to
+        selectorSink.send(1);
+        innerSink1.send('ignored');
+        innerSink2.send('b');
+        expect(events, ['a', 'b']);
+
+        // Dispose inner1's ref — should be safe since switchMap unlinked it
+        innerRef1.dispose();
+        innerSink2.send('c');
+        expect(events, ['a', 'b', 'c']);
+
+        sub.cancel();
+        selectorRef.dispose();
+        innerRef2.dispose();
+      });
+    });
+
+    test('switchMapState error in mapper propagates from evaluation', () {
+      scope.run(() {
+        late ValueStateSink<int> selector;
+        late FrappeReference<ValueState<int>> selectorRef;
+
+        runTransaction(() {
+          selector = ValueStateSink<int>(0);
+          selectorRef = selector.state.toReference();
+        });
+
+        final values = <int>[];
+        final sub = runTransaction(() => selector.state
+            .switchMapState((i) {
+              if (i == 99) throw StateError('bad');
+              return ValueState.constant(i * 10);
+            })
+            .listen(values.add));
+
+        expect(values, [0]); // initial: 0 * 10
+
+        selector.send(1);
+        expect(values, [0, 10]); // 1 * 10
+
+        // switchMapState uses map() internally, so the mapper runs
+        // during evaluation phase — errors propagate out of the transaction
+        expect(() => selector.send(99), throwsStateError);
+
+        // Graph is not corrupted — subsequent sends still work
+        selector.send(2);
+        expect(values, [0, 10, 20]); // 2 * 10
+
+        sub.cancel();
+        selectorRef.dispose();
+      });
+    });
+  });
+
   group('Transaction error recovery', () {
     test('error in evaluate handler propagates but does not corrupt state', () {
       final errors = <Object>[];
