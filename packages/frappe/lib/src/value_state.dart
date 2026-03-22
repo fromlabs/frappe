@@ -121,7 +121,7 @@ class ValueState<V> {
           Iterable<ValueState> states, Combiners<VR> combiner) =>
       Transaction.runRequired((_) {
         final targetNode = IndexNode<VR>(
-          evaluationType: EvaluationType.almostOneInput,
+          evaluationType: EvaluationType.atLeastOneInput,
           evaluateHandler: (inputs) => NodeEvaluation(
             combiner(Map.fromIterables(states, inputs.evaluations).entries.map(
                 (entry) => (entry.value?.isEvaluated ?? false)

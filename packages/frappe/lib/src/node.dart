@@ -21,7 +21,7 @@ enum EvaluationType {
   allInputs,
 
   /// Evaluate when at least one input has a value.
-  almostOneInput,
+  atLeastOneInput,
 
   /// Never evaluate (used for source/sink nodes).
   never,

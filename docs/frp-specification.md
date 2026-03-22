@@ -296,7 +296,7 @@ mu(combines [vs1, ..., vsn] f) = (
 
 Generalizes `combine` to N states. The combiner receives an iterable of all current values.
 
-**Evaluation type**: `almostOneInput` — evaluates when **at least one** input has changed. Non-changed inputs contribute their current committed value.
+**Evaluation type**: `atLeastOneInput` — evaluates when **at least one** input has changed. Non-changed inputs contribute their current committed value.
 
 #### 3.2.5 distinct
 
@@ -453,7 +453,7 @@ Each node has an `EvaluationType` that controls when it participates in evaluati
 |------|------------|
 | `always` | Every transaction (used for initial `toValues` emission) |
 | `allInputs` | All inputs have been evaluated and provided values |
-| `almostOneInput` | At least one input has been evaluated |
+| `atLeastOneInput` | At least one input has been evaluated |
 | `never` | Never evaluates (source nodes, disabled `once` nodes) |
 
 ---

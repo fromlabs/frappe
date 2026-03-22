@@ -137,7 +137,7 @@ class EventStream<E> {
     const input2 = 'input2';
 
     final targetNode = KeyNode<E>(
-      evaluationType: EvaluationType.almostOneInput,
+      evaluationType: EvaluationType.atLeastOneInput,
       evaluateHandler: (inputs) {
         // Only input2 fired — pass it through directly.
         if (inputs.get<E>(input1).isNotEvaluated) {

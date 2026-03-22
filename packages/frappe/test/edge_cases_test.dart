@@ -414,7 +414,7 @@ void main() {
       });
     });
 
-    test('almostOneInput evaluation type fires with partial input', () {
+    test('atLeastOneInput evaluation type fires with partial input', () {
       scope.run(() {
         late EventStreamSink<int> sink1;
         late EventStreamSink<int> sink2;
@@ -428,7 +428,7 @@ void main() {
           ref2 = sink2.stream.toReference();
         });
 
-        // orElse uses almostOneInput internally
+        // orElse uses atLeastOneInput internally
         final events = <int>[];
         final sub = runTransaction(
             () => sink1.stream.orElse(sink2.stream).listen(events.add));
