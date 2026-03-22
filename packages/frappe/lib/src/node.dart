@@ -107,6 +107,12 @@ abstract class Node<S> extends Referenceable {
     if (!source.isReferenced) {
       throw ArgumentError('Unreferenced source node: $source');
     }
+    // §8.3: nodes from different scopes must not link — isolation guarantee.
+    if (source._scope != _scope) {
+      throw ArgumentError(
+          'Cannot link nodes from different scopes: '
+          'target $this and source $source belong to different FrappeScopes');
+    }
     source._checkCycle(this);
 
     final sourceReference = reference(source);

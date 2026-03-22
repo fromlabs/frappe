@@ -344,4 +344,49 @@ void main() {
       expect(result, 'value: 42');
     });
   });
+
+  group('Cross-scope isolation', () {
+    test('linking nodes from different scopes throws', () {
+      final scope2 = FrappeScope();
+
+      late KeyNode<int> sourceInScope2;
+      late Reference<KeyNode<int>> sourceRef;
+
+      // Create a node in scope2
+      scope2.run(() {
+        runTransaction(() {
+          sourceInScope2 = KeyNode<int>(evaluationType: EvaluationType.never);
+          sourceRef = Reference(sourceInScope2);
+        });
+      });
+
+      // Try to link from scope1 — must throw
+      expect(() {
+        scope.run(() {
+          runTransaction(() {
+            final target =
+                KeyNode<int>(evaluateHandler: (inputs) => inputs.get<int>());
+            target.link(sourceInScope2);
+          });
+        });
+      }, throwsArgumentError);
+
+      scope2.run(() => sourceRef.dispose());
+      scope2.run(() => scope2.assertCleanState());
+      scope2.dispose();
+    });
+
+    test('linking nodes within same scope succeeds', () {
+      scope.run(() {
+        runTransaction(() {
+          final source = KeyNode<int>(evaluationType: EvaluationType.never);
+          final target =
+              KeyNode<int>(evaluateHandler: (inputs) => inputs.get<int>());
+          target.link(source);
+          expect(target.isLinked, isTrue);
+        });
+      });
+    });
+  });
+
 }
