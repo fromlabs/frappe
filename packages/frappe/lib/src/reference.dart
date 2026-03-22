@@ -175,25 +175,27 @@ abstract class Referenceable {
   }
 
   // Depth-first traversal through hosted reference chains to determine
-  // if [referenceable] is transitively kept alive.
+  // if [referenceable] is transitively kept alive (spec §7.2).
   //
   // For each reference pointing to [referenceable]:
   //   - If it is a plain Reference (non-hosted), the object is alive.
   //   - If it is a HostedReference, we recurse into its host to check
-  //     whether the host itself is alive. The [visited] set prevents
-  //     infinite loops in case of circular hosted chains.
-  bool _checkReferenced(
-      Referenceable referenceable, FrappeScope scope, Set<Reference> visited) {
+  //     whether the host itself is alive. The [visited] set tracks
+  //     Referenceable nodes (not Reference edges) to correctly detect
+  //     circular hosted chains (A hosts B, B hosts A) and avoid
+  //     infinite recursion.
+  bool _checkReferenced(Referenceable referenceable, FrappeScope scope,
+      Set<Referenceable> visited) {
+    if (visited.contains(referenceable)) return false;
+    visited.add(referenceable);
+
     final references = scope.references[referenceable];
     if (references != null && references.isNotEmpty) {
       for (final reference in references) {
         if (reference is HostedReference) {
-          if (!visited.contains(reference)) {
-            visited.add(reference);
-            // Recurse into the host to see if it has a non-hosted root.
-            if (_checkReferenced(reference._host, scope, visited)) {
-              return true;
-            }
+          // Recurse into the host to see if it has a non-hosted root.
+          if (_checkReferenced(reference._host, scope, visited)) {
+            return true;
           }
         } else {
           // A non-hosted reference means the object is directly kept alive.
