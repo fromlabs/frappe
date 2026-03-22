@@ -1,0 +1,35 @@
+name: flutter_petrol_pump
+description: Petrol Pump FRP example — Flutter UI.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  frappe:
+  flutter_frappe:
+  petrol_pump:
+  provider: ^6.1.2
+  audioplayers: ^6.4.0
+
+resolution: workspace
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/logo.png
+    - assets/nozzle1.png
+    - assets/nozzle2.png
+    - assets/nozzle3.png
+    - assets/beep.wav
+    - assets/fast.wav
+    - assets/slow.wav

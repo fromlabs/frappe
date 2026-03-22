@@ -1,0 +1,90 @@
+import 'package:frappe/frappe.dart';
+
+import '../logic/fill.dart';
+import '../logic/lifecycle.dart';
+import '../model.dart';
+
+/// Manages the point-of-sale notification lifecycle:
+/// tracks fill state, fuel flowing, and emits sale-complete events.
+class NotifyPointOfSale {
+  final ValueState<Fuel?> fillActiveState;
+  final ValueState<Fuel?> fuelFlowingState;
+  final EventStream<Fuel> startStream;
+  final EventStream<Unit> endStream;
+  final EventStream<Unit> beepStream;
+  final EventStream<Sale> saleCompleteStream;
+
+  factory NotifyPointOfSale({
+    required Lifecycle lifecycle,
+    required Fill fill,
+    required EventStream<Unit> clearSaleStream,
+  }) {
+    final phaseStateRef = ValueStateLink<_Phase>();
+
+    // Only allow start when idle.
+    final startStream = lifecycle.startStream
+        .gate(phaseStateRef.state.map((phase) => phase == _Phase.idle));
+
+    // Only allow end when filling.
+    final endStream = lifecycle.endStream
+        .gate(phaseStateRef.state.map((phase) => phase == _Phase.filling))
+        .mapToUnit();
+
+    // Phase transitions: idle → filling → pos → idle.
+    phaseStateRef.connect(startStream.mapTo(_Phase.filling).orElses([
+      endStream.mapTo(_Phase.pos),
+      clearSaleStream.mapTo(_Phase.idle),
+    ]).toState(_Phase.idle));
+
+    // Fuel flowing: set on start, cleared on end.
+    final fuelFlowingState = startStream
+        .map<Fuel?>((e) => e)
+        .orElse(endStream.mapTo<Fuel?>(null))
+        .toState(null);
+
+    // Fill active: set on start, cleared on clear-sale (not just end).
+    final fillActiveState = startStream
+        .map<Fuel?>((e) => e)
+        .orElse(clearSaleStream.mapTo<Fuel?>(null))
+        .toState(null);
+
+    // Build the sale snapshot and emit when the fill ends.
+    final saleCompleteStream = endStream
+        .snapshot<Sale?, Sale?>(
+            fuelFlowingState.combine3<double, double, double, Sale?>(
+                fill.priceState,
+                fill.dollarsDeliveredState,
+                fill.litersDeliveredState,
+                (fuelFlowing, price, dollarsDelivered, litersDelivered) =>
+                    fuelFlowing != null
+                        ? Sale(
+                            fuel: fuelFlowing,
+                            price: price,
+                            quantity: litersDelivered,
+                            cost: dollarsDelivered,
+                          )
+                        : null),
+            (_, sale) => sale)
+        .mapWhereNotNull();
+
+    return NotifyPointOfSale._(
+      fillActiveState: fillActiveState,
+      fuelFlowingState: fuelFlowingState,
+      startStream: startStream,
+      endStream: endStream,
+      beepStream: clearSaleStream,
+      saleCompleteStream: saleCompleteStream,
+    );
+  }
+
+  NotifyPointOfSale._({
+    required this.fillActiveState,
+    required this.fuelFlowingState,
+    required this.startStream,
+    required this.endStream,
+    required this.beepStream,
+    required this.saleCompleteStream,
+  });
+}
+
+enum _Phase { idle, filling, pos }
