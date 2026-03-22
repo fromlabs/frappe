@@ -352,10 +352,14 @@ class EventStream<E> {
         // Unlink detaches from the previous inner stream's node, then link
         // connects to the new inner stream produced by the mapper. The new link
         // will participate in subsequent transactions, not the current one.
+        // Capture mapper result before unlinking so that if the mapper
+        // throws, the node stays linked to its current source (spec §9.3:
+        // errors in closing handlers must not leave the graph inconsistent).
         Transaction.addClosingTransactionHandler(targetNode, (tx) {
           if (tx.hasValue(_node)) {
+            final newInner = mapper(tx.getValue(_node));
             targetNode.unlink();
-            targetNode.link(mapper(tx.getValue(_node)).node);
+            targetNode.link(newInner.node);
           }
         });
 

@@ -331,8 +331,11 @@ class ValueState<V> {
   // when the value is reference-counted (EventStream, ValueState, or raw
   // Referenceable), keeping it alive for as long as this state holds it.
   // Plain values need no reference — they are not reference-counted.
+  // Acquires the new reference before disposing the old one to prevent
+  // inconsistent state if reference() throws (spec §7: ref management
+  // must not leave dangling pointers).
   void _updateCurrentValueReference(V value) {
-    _currentValueReference?.dispose();
+    final oldRef = _currentValueReference;
     if (value is EventStream) {
       _currentValueReference = _node.reference(value.node);
     } else if (value is ValueState) {
@@ -342,5 +345,6 @@ class ValueState<V> {
     } else {
       _currentValueReference = null;
     }
+    oldRef?.dispose();
   }
 }

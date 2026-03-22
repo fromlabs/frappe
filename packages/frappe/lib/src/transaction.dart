@@ -292,8 +292,8 @@ class Transaction {
   // to sources). Tiebreaker: highest ID last (matches prior SplayTreeSet
   // behaviour where higher IDs were evaluated first at equal priority).
   static int _priorityComparator(Node a, Node b) {
-    final delta = a.evaluationPriority - b.evaluationPriority;
-    return delta != 0 ? delta : a.id - b.id;
+    final delta = a.evaluationPriority.compareTo(b.evaluationPriority);
+    return delta != 0 ? delta : a.id.compareTo(b.id);
   }
 
   void _evaluatePendingNodes() {

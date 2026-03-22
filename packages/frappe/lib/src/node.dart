@@ -55,8 +55,10 @@ abstract class Node<S> extends Referenceable {
     Handler? unreferencedHandler,
   })  : _scope = FrappeScope.current,
         id = FrappeScope.current.nodeIdCounter++,
+        // nodeIdCounter was post-incremented when assigning id, so
+        // (nodeIdCounter - 1) equals the id value assigned above.
         debugLabel =
-            '${debugLabel ?? 'node'}:${FrappeScope.current.nodeIdCounter}',
+            '${debugLabel ?? 'node'}:${FrappeScope.current.nodeIdCounter - 1}',
         _evaluationType = evaluationType {
     this.commitHandler = commitHandler ?? (S value) {};
     this.publishHandler = publishHandler ?? (S value) {};
