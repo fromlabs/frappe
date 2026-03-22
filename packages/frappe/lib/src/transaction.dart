@@ -339,6 +339,27 @@ class Transaction {
     }
   }
 
+  // --- Error handling strategy across transaction phases ---
+  //
+  // Evaluation and commit are *internal* phases: they execute framework code
+  // (node evaluateHandlers and commitHandlers) that is expected to be infallible.
+  // An exception here indicates a bug in the framework or a violated invariant,
+  // so we let it propagate — aborting the transaction before any listener is
+  // notified. The finally block in run()/runNew() still calls _close() to
+  // release transaction-scoped references.
+  //
+  // Publish and closing are *external* phases: they invoke user-supplied
+  // listeners and closing handlers (e.g., switchState relinking) that may
+  // legitimately throw. Each iteration is individually try-caught so that one
+  // failing handler does not prevent delivery to the remaining handlers.
+  //
+  // Note on commit atomicity: if a commitHandler were to throw mid-loop, nodes
+  // committed before the failure would keep their new values while the rest
+  // would retain old values — a partial commit. True rollback would require
+  // snapshotting pre-commit state, adding significant complexity. In practice
+  // commitHandlers only perform assignments and reference bookkeeping (see
+  // ValueState._node.commitHandler), so failures are not expected.
+
   void _commitValue() {
     _phase = TransactionPhase.commit;
     for (final entry in _evaluations.entries) {

@@ -44,8 +44,17 @@ class _ObserveState<V> extends State<Observe<V>> {
 
   void _subscribe() {
     _value = widget.state.getValue();
+    // Errors thrown inside this listener are caught by
+    // Transaction._publishValue's per-handler try-catch and routed to
+    // FrappeScope.reportError — they won't crash the widget tree.
+    // The mounted guard is belt-and-suspenders: the subscription is
+    // cancelled in dispose(), but we check anyway to be safe against
+    // framework-level edge cases (e.g. a listener firing during a
+    // disposal sequence).
     _subscription = widget.state.listen((value) {
-      setState(() => _value = value);
+      if (mounted) {
+        setState(() => _value = value);
+      }
     });
   }
 
