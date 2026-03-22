@@ -1,11 +1,11 @@
-name: frappe
-description: A functional reactive programming library for Dart with scoped state management.
-version: 1.0.0
-homepage: https://github.com/fromlabs/frappe
+name: _frappe_workspace
+publish_to: none
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
 
-dev_dependencies:
-  test: ^1.25.0
-  lints: ^6.1.0
+workspace:
+  - packages/frappe
+  - packages/brew
+  - packages/flutter_frappe
+  - packages/flutter_brew

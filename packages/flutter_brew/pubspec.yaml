@@ -1,0 +1,20 @@
+name: flutter_brew
+description: Flutter integration for Brew reactive business logic.
+version: 0.1.0
+homepage: https://github.com/fromlabs/frappe
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  brew:
+  flutter_frappe:
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0

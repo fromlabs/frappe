@@ -1,0 +1,16 @@
+name: brew
+description: Reactive business logic units built on frappe.
+version: 0.1.0
+homepage: https://github.com/fromlabs/frappe
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+resolution: workspace
+
+dependencies:
+  frappe:
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^6.1.0
