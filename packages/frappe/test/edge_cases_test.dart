@@ -1156,6 +1156,46 @@ void main() {
 
   // --- Phase 3: Test coverage gaps ---
 
+  group('snapshot reference lifetime', () {
+    test('fromState stays alive while snapshot output is referenced', () {
+      scope.run(() {
+        late EventStreamSink<int> eventSink;
+        late ValueStateSink<int> stateSink;
+        late FrappeReference<EventStream<int>> eventRef;
+        late FrappeReference<ValueState<int>> stateRef;
+
+        runTransaction(() {
+          eventSink = EventStreamSink<int>();
+          stateSink = ValueStateSink<int>(10);
+          eventRef = eventSink.stream.toReference();
+          stateRef = stateSink.state.toReference();
+        });
+
+        final events = <String>[];
+        final sub = runTransaction(() => eventSink.stream
+            .snapshot(stateSink.state, (e, s) => '$e:$s')
+            .listen(events.add));
+
+        // Dispose the user's reference to the state — the hosted
+        // reference from the snapshot node keeps it alive.
+        stateRef.dispose();
+
+        // State is still usable via snapshot
+        eventSink.send(1);
+        expect(events, ['1:10']);
+
+        stateSink.send(20);
+        eventSink.send(2);
+        expect(events, ['1:10', '2:20']);
+
+        // Disposing the listener unreferences the snapshot node,
+        // which then unreferences fromState.node via hosted ref cleanup.
+        sub.cancel();
+        eventRef.dispose();
+      });
+    });
+  });
+
   group('switchMap edge cases', () {
     test('rapid re-switching keeps only latest inner stream', () {
       scope.run(() {
