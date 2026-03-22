@@ -77,7 +77,7 @@ class NodeEvaluationMap extends NodeEvaluationCollection {
         super(evaluationEntries.every(
             (entry) => entry.value != null && entry.value!.isEvaluated));
 
-  NodeEvaluation<V> get<V>([key = defaultEvaluationKey]) {
+  NodeEvaluation<V> get<V>([dynamic key = defaultEvaluationKey]) {
     final evaluation = _evaluations[key];
     if (evaluation == null) return NodeEvaluation<V>.not();
     return evaluation as NodeEvaluation<V>;

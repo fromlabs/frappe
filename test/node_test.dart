@@ -1,8 +1,6 @@
 import 'package:frappe/frappe.dart';
 import 'package:frappe/src/node.dart';
-import 'package:frappe/src/node_evaluation.dart';
 import 'package:frappe/src/reference.dart';
-import 'package:frappe/src/transaction.dart' show Transaction;
 import 'package:test/test.dart';
 
 void main() {
@@ -166,6 +164,7 @@ void main() {
       scope.run(() {
         late KeyNode<int> inputNode;
         late Reference<KeyNode<int>> inputRef;
+        late Reference<KeyNode<int>> doublerRef;
         int? publishedValue;
 
         scope.runTransaction(() {
@@ -179,7 +178,7 @@ void main() {
           );
 
           doubler.link(inputNode);
-          Reference(doubler);
+          doublerRef = Reference(doubler);
         });
 
         // Send value through graph
@@ -190,6 +189,7 @@ void main() {
 
         expect(publishedValue, 10); // 5 * 2
 
+        doublerRef.dispose();
         inputRef.dispose();
       });
     });
@@ -197,10 +197,12 @@ void main() {
     test('evaluation order follows priority', () {
       scope.run(() {
         final order = <String>[];
+        late Reference<KeyNode<int>> sourceRef;
+        late Reference<KeyNode<int>> endRef;
 
         scope.runTransaction(() {
           final source = KeyNode<int>(evaluationType: EvaluationType.never);
-          final ref = Reference(source);
+          sourceRef = Reference(source);
 
           final mid = KeyNode<int>(
             evaluateHandler: (inputs) {
@@ -218,16 +220,17 @@ void main() {
             publishHandler: (_) {},
           );
           end.link(mid);
-          Reference(end);
+          endRef = Reference(end);
 
           // Trigger evaluation
           final tx = Transaction.requiredTransaction;
           tx.setValue(source, 1);
-
-          ref.dispose();
         });
 
         expect(order, ['mid', 'end']); // Mid evaluates before end
+
+        endRef.dispose();
+        sourceRef.dispose();
       });
     });
 
@@ -235,6 +238,7 @@ void main() {
       scope.run(() {
         late KeyNode<int> inputNode;
         late Reference<KeyNode<int>> inputRef;
+        late Reference<KeyNode<int>> distinctRef;
         final published = <int>[];
 
         scope.runTransaction(() {
@@ -254,7 +258,7 @@ void main() {
             publishHandler: (value) => published.add(value),
           );
           distinctNode.link(inputNode);
-          Reference(distinctNode);
+          distinctRef = Reference(distinctNode);
         });
 
         scope.runTransaction(() {
@@ -269,6 +273,7 @@ void main() {
 
         expect(published, [1, 2]); // Duplicate 1 filtered
 
+        distinctRef.dispose();
         inputRef.dispose();
       });
     });

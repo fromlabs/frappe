@@ -332,17 +332,44 @@ class EventStream<E> {
         return EventStream._(targetNode);
       });
 
+  /// Maps each event to an inner stream and switches to it,
+  /// cancelling the previous inner stream.
+  ///
+  /// When this stream fires, [mapper] produces a new inner stream.
+  /// The output stream emits events from the latest inner stream only.
+  /// Previous inner streams are unlinked (cancelled).
+  EventStream<ER> switchMap<ER>(Mapper<E, EventStream<ER>> mapper) =>
+      Transaction.runRequired((_) {
+        final targetNode =
+            KeyNode<ER>(evaluateHandler: _defaultEvaluateHandler);
+
+        Transaction.addClosingTransactionHandler(targetNode, (tx) {
+          if (tx.hasValue(_node)) {
+            targetNode.unlink();
+            targetNode.link(mapper(tx.getValue(_node)).node);
+          }
+        });
+
+        targetNode.reference(_node);
+        return EventStream._(targetNode);
+      });
+
   void _sendValue(E event, Merger<E> sinkMerger) {
-    Transaction.run((tx) {
-      if (tx.phase != TransactionPhase.opened) {
-        throw UnsupportedError("Can't send value during evaluation/commit/publish");
-      }
-      if (tx.hasValue(_node)) {
-        tx.setValue(_node, sinkMerger(event, tx.getValue(_node)));
-      } else {
+    final current = Transaction.currentTransaction;
+    if (current != null && current.phase != TransactionPhase.opened) {
+      // During publish/closing, create a new transaction (e.g., send from listener)
+      Transaction.runNew((tx) {
         tx.setValue(_node, event);
-      }
-    });
+      });
+    } else {
+      Transaction.run((tx) {
+        if (tx.hasValue(_node)) {
+          tx.setValue(_node, sinkMerger(event, tx.getValue(_node)));
+        } else {
+          tx.setValue(_node, event);
+        }
+      });
+    }
   }
 }
 

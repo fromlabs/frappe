@@ -19,7 +19,7 @@
 /// });
 /// scope.dispose();
 /// ```
-library frappe;
+library;
 
 export 'src/unit.dart';
 export 'src/tuple.dart';

@@ -329,7 +329,8 @@ void main() {
         expect(events, [6, -12]); // 6 * -2
 
         // Switch to never
-        switchSink.send(EventStream<int>.never());
+        scope.runTransaction(
+            () => switchSink.send(EventStream<int>.never()));
         sink1.send(10);
         sink2.send(20);
         expect(events, [6, -12]); // No more events
@@ -589,6 +590,367 @@ void main() {
         sub.cancel();
         selectorRef.dispose();
         dataRef.dispose();
+      });
+    });
+  });
+
+  group('ValueState additional coverage', () {
+    test('combines with single state', () {
+      scope.run(() {
+        late ValueStateSink<int> sink;
+        late FrappeReference<ValueState<int>> ref;
+
+        scope.runTransaction(() {
+          sink = ValueStateSink<int>(3);
+          ref = sink.state.toReference();
+        });
+
+        final values = <int>[];
+        final sub = scope.runTransaction(() =>
+            ValueState.combines<int>([sink.state], (vals) {
+              final it = vals.iterator;
+              it.moveNext();
+              return it.current * 10;
+            }).listen(values.add));
+
+        expect(values, [30]); // 3 * 10
+
+        sink.send(5);
+        expect(values, [30, 50]); // 5 * 10
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('combines states change simultaneously', () {
+      scope.run(() {
+        late ValueStateSink<int> sink1;
+        late ValueStateSink<int> sink2;
+        late FrappeReference<ValueState<int>> ref1;
+        late FrappeReference<ValueState<int>> ref2;
+
+        scope.runTransaction(() {
+          sink1 = ValueStateSink<int>(1);
+          sink2 = ValueStateSink<int>(2);
+          ref1 = sink1.state.toReference();
+          ref2 = sink2.state.toReference();
+        });
+
+        final values = <int>[];
+        final sub = scope.runTransaction(() =>
+            ValueState.combines<int>(
+                [sink1.state, sink2.state],
+                (vals) {
+                  final it = vals.iterator;
+                  it.moveNext();
+                  final v1 = it.current as int;
+                  it.moveNext();
+                  final v2 = it.current as int;
+                  return v1 + v2;
+                }).listen(values.add));
+
+        expect(values, [3]); // 1 + 2
+
+        // Both change in the same transaction
+        scope.runTransaction(() {
+          sink1.send(10);
+          sink2.send(20);
+        });
+        expect(values, [3, 30]); // 10 + 20, single combined event
+
+        sub.cancel();
+        ref1.dispose();
+        ref2.dispose();
+      });
+    });
+
+    test('switchStream with same stream instance is no-op', () {
+      scope.run(() {
+        late EventStreamSink<int> dataSink;
+        late ValueStateSink<EventStream<int>> switchSink;
+        late FrappeReference<EventStream<int>> dataRef;
+        late FrappeReference<ValueState<EventStream<int>>> switchRef;
+
+        scope.runTransaction(() {
+          dataSink = EventStreamSink<int>();
+          dataRef = dataSink.stream.toReference();
+          switchSink =
+              ValueStateSink<EventStream<int>>(dataSink.stream);
+          switchRef = switchSink.state.toReference();
+        });
+
+        final events = <int>[];
+        final sub = scope.runTransaction(() =>
+            ValueState.switchStream(switchSink.state).listen(events.add));
+
+        dataSink.send(1);
+        expect(events, [1]);
+
+        // Send the same stream instance again
+        scope.runTransaction(() => switchSink.send(dataSink.stream));
+
+        dataSink.send(2);
+        expect(events, [1, 2]); // Still receives events
+
+        // Send the same stream instance yet again
+        scope.runTransaction(() => switchSink.send(dataSink.stream));
+
+        dataSink.send(3);
+        expect(events, [1, 2, 3]); // Still working
+
+        sub.cancel();
+        dataRef.dispose();
+        switchRef.dispose();
+      });
+    });
+
+    test('switchMapState with constant mapper', () {
+      scope.run(() {
+        late ValueStateSink<int> sink;
+        late FrappeReference<ValueState<int>> ref;
+
+        scope.runTransaction(() {
+          sink = ValueStateSink<int>(1);
+          ref = sink.state.toReference();
+        });
+
+        final values = <int>[];
+        final sub = scope.runTransaction(() => sink.state
+            .switchMapState((_) => ValueState.constant(42))
+            .listen(values.add));
+
+        expect(values, [42]);
+
+        sink.send(2);
+        expect(values, [42, 42]); // Always 42
+
+        sink.send(99);
+        expect(values, [42, 42, 42]); // Still always 42
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('toValues called after send reflects latest', () {
+      scope.run(() {
+        late ValueStateSink<int> sink;
+        late FrappeReference<ValueState<int>> ref;
+
+        scope.runTransaction(() {
+          sink = ValueStateSink<int>(0);
+          ref = sink.state.toReference();
+        });
+
+        sink.send(1);
+
+        final values = <int>[];
+        final sub =
+            scope.runTransaction(() => sink.state.toValues().listen(values.add));
+
+        expect(values, [1]); // Reflects latest value after send
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('multiple toValues each deliver initial', () {
+      scope.run(() {
+        late ValueStateSink<int> sink;
+        late FrappeReference<ValueState<int>> ref;
+
+        scope.runTransaction(() {
+          sink = ValueStateSink<int>(5);
+          ref = sink.state.toReference();
+        });
+
+        final values1 = <int>[];
+        final values2 = <int>[];
+
+        final sub1 =
+            scope.runTransaction(() => sink.state.toValues().listen(values1.add));
+        final sub2 =
+            scope.runTransaction(() => sink.state.toValues().listen(values2.add));
+
+        expect(values1, [5]); // First listener receives initial
+        expect(values2, [5]); // Second listener also receives initial
+
+        sub1.cancel();
+        sub2.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('toUpdates with no updates produces empty', () {
+      scope.run(() {
+        late ValueStateSink<int> sink;
+        late FrappeReference<ValueState<int>> ref;
+
+        scope.runTransaction(() {
+          sink = ValueStateSink<int>(0);
+          ref = sink.state.toReference();
+        });
+
+        final updates = <int>[];
+        final sub = scope.runTransaction(
+            () => sink.state.toUpdates().listen(updates.add));
+
+        // No send calls
+        expect(updates, isEmpty);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('ValueStateLink state before connect uses lazy', () {
+      scope.run(() {
+        late ValueStateLink<int> link;
+        late FrappeReference<ValueState<int>> linkRef;
+
+        scope.runTransaction(() {
+          link = ValueStateLink<int>();
+          linkRef = link.state.toReference();
+        });
+
+        // Before connect, getValue should throw StateError
+        expect(
+            () => scope.runTransaction(() => link.state.getValue()),
+            throwsStateError);
+
+        expect(link.isConnected, isFalse);
+
+        // Now connect and verify it works
+        late ValueStateSink<int> sink;
+        late FrappeReference<ValueState<int>> sinkRef;
+
+        scope.runTransaction(() {
+          sink = ValueStateSink<int>(10);
+          sinkRef = sink.state.toReference();
+          link.connect(sink.state);
+        });
+
+        expect(link.isConnected, isTrue);
+
+        final values = <int>[];
+        final sub = scope.runTransaction(() => link.state.listen(values.add));
+
+        expect(values, [10]);
+
+        sink.send(20);
+        expect(values, [10, 20]);
+
+        sub.cancel();
+        linkRef.dispose();
+        sinkRef.dispose();
+      });
+    });
+
+    test('distinct with default equality', () {
+      scope.run(() {
+        late ValueStateSink<String> sink;
+        late FrappeReference<ValueState<String>> ref;
+
+        scope.runTransaction(() {
+          sink = ValueStateSink<String>('a');
+          ref = sink.state.toReference();
+        });
+
+        final values = <String>[];
+        final sub = scope.runTransaction(
+            () => sink.state.distinct().listen(values.add));
+
+        expect(values, ['a']); // Initial value
+
+        sink.send('a'); // Duplicate, filtered
+        expect(values, ['a']);
+
+        sink.send('b'); // New value
+        expect(values, ['a', 'b']);
+
+        sink.send('b'); // Duplicate, filtered
+        expect(values, ['a', 'b']);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('switchMapStream maps and switches correctly', () {
+      scope.run(() {
+        late ValueStateSink<int> selectorSink;
+        late EventStreamSink<int> dataSink;
+        late FrappeReference<ValueState<int>> selectorRef;
+        late FrappeReference<EventStream<int>> dataRef;
+
+        scope.runTransaction(() {
+          selectorSink = ValueStateSink<int>(1);
+          dataSink = EventStreamSink<int>();
+          selectorRef = selectorSink.state.toReference();
+          dataRef = dataSink.stream.toReference();
+        });
+
+        final events = <int>[];
+        final sub = scope.runTransaction(() => selectorSink.state
+            .switchMapStream(
+                (selector) => dataSink.stream.map((v) => v * selector))
+            .listen(events.add));
+
+        // With selector=1, data*1
+        dataSink.send(3);
+        expect(events, [3]); // 3 * 1
+
+        dataSink.send(7);
+        expect(events, [3, 7]); // 7 * 1
+
+        // Switch to selector=2
+        selectorSink.send(2);
+        dataSink.send(3);
+        expect(events, [3, 7, 6]); // 3 * 2
+
+        dataSink.send(5);
+        expect(events, [3, 7, 6, 10]); // 5 * 2
+
+        sub.cancel();
+        selectorRef.dispose();
+        dataRef.dispose();
+      });
+    });
+
+    test('combine updates when either state changes', () {
+      scope.run(() {
+        late ValueStateSink<String> sink1;
+        late ValueStateSink<String> sink2;
+        late FrappeReference<ValueState<String>> ref1;
+        late FrappeReference<ValueState<String>> ref2;
+
+        scope.runTransaction(() {
+          sink1 = ValueStateSink<String>('hello');
+          sink2 = ValueStateSink<String>('world');
+          ref1 = sink1.state.toReference();
+          ref2 = sink2.state.toReference();
+        });
+
+        final values = <String>[];
+        final sub = scope.runTransaction(() => sink1.state
+            .combine(sink2.state, (v1, v2) => '$v1 $v2')
+            .listen(values.add));
+
+        expect(values, ['hello world']); // Initial
+
+        // Change only the first state
+        sink1.send('hi');
+        expect(values, ['hello world', 'hi world']);
+
+        // Change only the second state
+        sink2.send('there');
+        expect(values, ['hello world', 'hi world', 'hi there']);
+
+        sub.cancel();
+        ref1.dispose();
+        ref2.dispose();
       });
     });
   });

@@ -604,14 +604,12 @@ void main() {
       scope.run(() {
         late EventStreamSink<int> sink;
         late FrappeReference<EventStream<int>> ref;
-        var cleaned = false;
 
         scope.runTransaction(() {
           sink = EventStreamSink<int>();
           ref = sink.stream.toReference();
         });
 
-        final cleanableSub = ListenSubscription();
         final events = <int>[];
 
         final sub = scope.runTransaction(() {
@@ -828,6 +826,486 @@ void main() {
           });
         }, throwsStateError);
 
+        ref.dispose();
+      });
+    });
+  });
+
+  group('EventStream additional coverage', () {
+    test('cast casts stream type', () {
+      scope.run(() {
+        late EventStreamSink<num> sink;
+        late FrappeReference<EventStream<num>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<num>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <num>[];
+        final sub = scope.runTransaction(
+            () => sink.stream.cast<num>().listen(events.add));
+
+        sink.send(1);
+        sink.send(2.5);
+
+        expect(events, [1, 2.5]);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('mapTo chains correctly', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <String>[];
+        final sub = scope.runTransaction(
+            () => sink.stream.mapTo(10).mapTo('hello').listen(events.add));
+
+        sink.send(99);
+
+        expect(events, ['hello']);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('accumulate returns same value still emits', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final values = <int>[];
+        // Accumulator ignores the event and returns the current state unchanged
+        final sub = scope.runTransaction(() =>
+            sink.stream.accumulate(0, (event, state) => state).listen(values.add));
+
+        expect(values, [0]); // Initial
+
+        sink.send(1);
+        expect(values, [0, 0]); // Accumulator returns state=0, still emits
+
+        sink.send(2);
+        expect(values, [0, 0, 0]);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('accumulateLazy provider called exactly once', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        var providerCallCount = 0;
+        final values = <int>[];
+        final sub = scope.runTransaction(() => sink.stream
+            .accumulateLazy(LazyValue.provide(() {
+              providerCallCount++;
+              return 0;
+            }), (int acc, int e) => acc + e)
+            .listen(values.add));
+
+        sink.send(1);
+        sink.send(2);
+        sink.send(3);
+
+        expect(providerCallCount, 1);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('gate starts closed stays closed', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <int>[];
+        final sub = scope.runTransaction(() =>
+            sink.stream.gate(ValueState.constant(false)).listen(events.add));
+
+        sink.send(1);
+        sink.send(2);
+        sink.send(3);
+
+        expect(events, isEmpty);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('gate opens mid-stream', () {
+      scope.run(() {
+        late EventStreamSink<int> eventSink;
+        late ValueStateSink<bool> gateSink;
+        late FrappeReference<EventStream<int>> eventRef;
+        late FrappeReference<ValueState<bool>> gateRef;
+
+        scope.runTransaction(() {
+          eventSink = EventStreamSink<int>();
+          gateSink = ValueStateSink<bool>(false);
+          eventRef = eventSink.stream.toReference();
+          gateRef = gateSink.state.toReference();
+        });
+
+        final events = <int>[];
+        final sub = scope.runTransaction(
+            () => eventSink.stream.gate(gateSink.state).listen(events.add));
+
+        eventSink.send(1);
+        eventSink.send(2);
+        expect(events, isEmpty); // Gate closed
+
+        gateSink.send(true);
+        eventSink.send(3);
+        eventSink.send(4);
+        expect(events, [3, 4]); // Only events after gate opened
+
+        sub.cancel();
+        eventRef.dispose();
+        gateRef.dispose();
+      });
+    });
+
+    test('snapshot reads current state value', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final results = <int>[];
+        final sub = scope.runTransaction(() => sink.stream
+            .snapshot(ValueState.constant(100), (event, state) => event + state)
+            .listen(results.add));
+
+        sink.send(1);
+
+        expect(results, [101]);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('once with multiple listeners all receive first event', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final events1 = <int>[];
+        final events2 = <int>[];
+        late ListenSubscription sub1;
+        late ListenSubscription sub2;
+
+        scope.runTransaction(() {
+          final onceStream = sink.stream.once();
+          sub1 = onceStream.listen(events1.add);
+          sub2 = onceStream.listen(events2.add);
+        });
+
+        sink.send(1);
+
+        expect(events1, [1]);
+        expect(events2, [1]);
+
+        sink.send(2);
+
+        expect(events1, [1]); // No second event
+        expect(events2, [1]);
+
+        sub1.cancel();
+        sub2.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('orElse first stream is never', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <int>[];
+        final sub = scope.runTransaction(() =>
+            EventStream<int>.never().orElse(sink.stream).listen(events.add));
+
+        sink.send(1);
+        sink.send(2);
+
+        expect(events, [1, 2]);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('orElses simultaneous emissions use merger', () {
+      scope.run(() {
+        late EventStreamSink<int> sink1;
+        late EventStreamSink<int> sink2;
+        late FrappeReference<EventStream<int>> ref1;
+        late FrappeReference<EventStream<int>> ref2;
+
+        scope.runTransaction(() {
+          sink1 = EventStreamSink<int>();
+          sink2 = EventStreamSink<int>();
+          ref1 = sink1.stream.toReference();
+          ref2 = sink2.stream.toReference();
+        });
+
+        final events = <int>[];
+        final sub = scope.runTransaction(() => EventStream.merges(
+              [sink1.stream, sink2.stream],
+              (a, b) => a + b,
+            ).listen(events.add));
+
+        scope.runTransaction(() {
+          sink1.send(3);
+          sink2.send(7);
+        });
+
+        expect(events, [10]); // 3 + 7
+
+        sub.cancel();
+        ref1.dispose();
+        ref2.dispose();
+      });
+    });
+
+    test('listenOnce listener error is caught', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        scope.runTransaction(
+            () => sink.stream.listenOnce((_) => throw Exception('test error')));
+
+        // Should not propagate - error is caught by transaction's onError
+        sink.send(1);
+
+        ref.dispose();
+      });
+    });
+
+    test('cast to supertype', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <num>[];
+        final sub = scope.runTransaction(
+            () => sink.stream.cast<num>().listen(events.add));
+
+        sink.send(42);
+
+        expect(events, [42]);
+        expect(events.first, isA<num>());
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('mapToNull emits null', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <int?>[];
+        final sub = scope.runTransaction(
+            () => sink.stream.mapToNull().listen(events.add));
+
+        sink.send(42);
+
+        expect(events, [null]);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('whereType filters and casts', () {
+      scope.run(() {
+        late EventStreamSink<Object> sink;
+        late FrappeReference<EventStream<Object>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<Object>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <int>[];
+        final sub = scope.runTransaction(
+            () => sink.stream.whereType<int>().listen(events.add));
+
+        sink.send(1);
+        sink.send('hello');
+        sink.send(2);
+
+        expect(events, [1, 2]);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+  });
+
+  group('EventStream switchMap', () {
+    test('switches to inner stream from each event', () {
+      scope.run(() {
+        late EventStreamSink<int> selectorSink;
+        late EventStreamSink<int> dataSink1;
+        late EventStreamSink<int> dataSink2;
+        late FrappeReference<EventStream<int>> selectorRef;
+        late FrappeReference<EventStream<int>> dataRef1;
+        late FrappeReference<EventStream<int>> dataRef2;
+
+        scope.runTransaction(() {
+          selectorSink = EventStreamSink<int>();
+          dataSink1 = EventStreamSink<int>();
+          dataSink2 = EventStreamSink<int>();
+          selectorRef = selectorSink.stream.toReference();
+          dataRef1 = dataSink1.stream.toReference();
+          dataRef2 = dataSink2.stream.toReference();
+        });
+
+        final events = <int>[];
+        final streams = [dataSink1.stream, dataSink2.stream];
+
+        final sub = scope.runTransaction(() =>
+            selectorSink.stream.switchMap((idx) => streams[idx]).listen(events.add));
+
+        // No inner stream yet — data events are ignored
+        dataSink1.send(100);
+        expect(events, isEmpty);
+
+        // Switch to stream 0
+        selectorSink.send(0);
+        dataSink1.send(1);
+        dataSink2.send(99);
+        expect(events, [1]); // Only stream 0
+
+        // Switch to stream 1
+        selectorSink.send(1);
+        dataSink1.send(88);
+        dataSink2.send(2);
+        expect(events, [1, 2]); // Now stream 1
+
+        sub.cancel();
+        selectorRef.dispose();
+        dataRef1.dispose();
+        dataRef2.dispose();
+      });
+    });
+
+    test('switchMap with mapper that transforms', () {
+      scope.run(() {
+        late EventStreamSink<int> multiplierSink;
+        late EventStreamSink<int> dataSink;
+        late FrappeReference<EventStream<int>> multiplierRef;
+        late FrappeReference<EventStream<int>> dataRef;
+
+        scope.runTransaction(() {
+          multiplierSink = EventStreamSink<int>();
+          dataSink = EventStreamSink<int>();
+          multiplierRef = multiplierSink.stream.toReference();
+          dataRef = dataSink.stream.toReference();
+        });
+
+        final events = <int>[];
+        final sub = scope.runTransaction(() => multiplierSink.stream
+            .switchMap((m) => dataSink.stream.map((v) => v * m))
+            .listen(events.add));
+
+        // Set multiplier to 2
+        multiplierSink.send(2);
+        dataSink.send(5);
+        expect(events, [10]); // 5 * 2
+
+        // Change multiplier to 3
+        multiplierSink.send(3);
+        dataSink.send(5);
+        expect(events, [10, 15]); // 5 * 3
+
+        sub.cancel();
+        multiplierRef.dispose();
+        dataRef.dispose();
+      });
+    });
+
+    test('switchMap without initial event emits nothing', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <String>[];
+        final sub = scope.runTransaction(() =>
+            sink.stream.switchMap((_) => EventStream<String>.never()).listen(events.add));
+
+        expect(events, isEmpty);
+
+        sub.cancel();
         ref.dispose();
       });
     });

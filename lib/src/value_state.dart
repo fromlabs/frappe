@@ -145,7 +145,11 @@ class ValueState<V> {
         Transaction.addClosingTransactionHandler(targetNode, (tx) {
           if (tx.hasValue(statesState._node)) {
             targetNode.unlink();
-            targetNode.link(statesState.getValue()._node);
+            final newInnerState = statesState.getValue();
+            targetNode.link(newInnerState._node);
+            Transaction.runNew((newTx) {
+              newTx.setValue(targetNode, newInnerState.getValue());
+            });
           }
         });
 
@@ -212,9 +216,25 @@ class ValueState<V> {
       Transaction.runRequired((_) => _stream);
 
   /// Filters out consecutive duplicate values.
+  ///
+  /// Unlike [EventStream.distinct], this initializes the previous value
+  /// to the current state value, so the first update is correctly filtered
+  /// against the initial value already delivered via [listen]/[toValues].
   ValueState<V> distinct([Equalizer<V>? distinctEquals]) =>
-      Transaction.runRequired(
-          (_) => ValueState._(_currentLazyValue, _stream.distinct(distinctEquals)));
+      Transaction.runRequired((_) {
+        final equals = distinctEquals ?? (V a, V b) => a == b;
+        var previous = NodeEvaluation<V>(getValue());
+        final targetNode = KeyNode<V>(
+          evaluateHandler: (inputs) =>
+              previous.isNotEvaluated ||
+                      !equals(inputs.get<V>().value, previous.value)
+                  ? inputs.get<V>()
+                  : NodeEvaluation<V>.not(),
+          commitHandler: (value) => previous = NodeEvaluation(value),
+        );
+        targetNode.link(_stream.node);
+        return ValueState._(_currentLazyValue, createEventStream(targetNode));
+      });
 
   /// Transforms the value using [mapper].
   ValueState<VR> map<VR>(Mapper<V, VR> mapper) => Transaction.runRequired(

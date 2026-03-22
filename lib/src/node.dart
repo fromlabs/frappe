@@ -96,7 +96,7 @@ abstract class Node<S> extends Referenceable {
   String toString() =>
       '[$debugLabel:$runtimeType:$_evaluationType:$_evaluationPriority]';
 
-  void _linkSource(key, Node source) {
+  void _linkSource(dynamic key, Node source) {
     assert(key != null);
     if (!isReferenced) {
       throw ArgumentError('Unreferenced target node: $this');
@@ -114,7 +114,7 @@ abstract class Node<S> extends Referenceable {
     source._linkTarget(this, key);
   }
 
-  void _unlinkSource(key) {
+  void _unlinkSource(dynamic key) {
     final sourceReference = sourceReferences.remove(key);
     if (sourceReference != null) {
       if (sourceReferences.isEmpty) {
@@ -172,32 +172,25 @@ class KeyNode<S> extends Node<S> {
   final KeyNodeEvaluator<S> _evaluateHandler;
 
   KeyNode({
-    String? debugLabel,
-    EvaluationType evaluationType = EvaluationType.allInputs,
+    super.debugLabel,
+    super.evaluationType = EvaluationType.allInputs,
     KeyNodeEvaluator<S>? evaluateHandler,
-    ValueHandler<S>? commitHandler,
-    ValueHandler<S>? publishHandler,
-    Handler? unreferencedHandler,
-  })  : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler,
-        super(
-          debugLabel: debugLabel,
-          evaluationType: evaluationType,
-          commitHandler: commitHandler,
-          publishHandler: publishHandler,
-          unreferencedHandler: unreferencedHandler,
-        );
+    super.commitHandler,
+    super.publishHandler,
+    super.unreferencedHandler,
+  }) : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler;
 
   static NodeEvaluation<S> _missingEvaluateHandler<S>(
           NodeEvaluationMap inputs) =>
       throw StateError('Missing evaluate handler');
 
-  bool isLinkedKey({key = defaultEvaluationKey}) =>
+  bool isLinkedKey({dynamic key = defaultEvaluationKey}) =>
       sourceReferences.containsKey(key);
 
-  void link(Node source, {key = defaultEvaluationKey}) =>
+  void link(Node source, {dynamic key = defaultEvaluationKey}) =>
       _linkSource(key, source);
 
-  void unlink({key = defaultEvaluationKey}) => _unlinkSource(key);
+  void unlink({dynamic key = defaultEvaluationKey}) => _unlinkSource(key);
 
   @override
   void onUnreferenced() {
@@ -222,20 +215,13 @@ class IndexNode<S> extends Node<S> {
   final IndexNodeEvaluator<S> _evaluateHandler;
 
   IndexNode({
-    String? debugLabel,
-    EvaluationType evaluationType = EvaluationType.allInputs,
+    super.debugLabel,
+    super.evaluationType = EvaluationType.allInputs,
     IndexNodeEvaluator<S>? evaluateHandler,
-    ValueHandler<S>? commitHandler,
-    ValueHandler<S>? publishHandler,
-    Handler? unreferencedHandler,
-  })  : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler,
-        super(
-          debugLabel: debugLabel,
-          evaluationType: evaluationType,
-          commitHandler: commitHandler,
-          publishHandler: publishHandler,
-          unreferencedHandler: unreferencedHandler,
-        );
+    super.commitHandler,
+    super.publishHandler,
+    super.unreferencedHandler,
+  }) : _evaluateHandler = evaluateHandler ?? _missingEvaluateHandler;
 
   static NodeEvaluation<S> _missingEvaluateHandler<S>(
           NodeEvaluationList inputs) =>

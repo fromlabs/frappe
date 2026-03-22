@@ -735,6 +735,7 @@ void main() {
       scope.run(() {
         late ValueStateSink<int> sink;
         late FrappeReference<ValueState<int>> ref;
+        late FrappeReference<ValueState<int>> refWithSub;
         var listenerCancelled = false;
 
         scope.runTransaction(() {
@@ -747,13 +748,16 @@ void main() {
         });
 
         scope.runTransaction(() {
-          sink.state.addReferencedSubscription(trackingSub);
+          refWithSub =
+              sink.state.addReferencedSubscription(trackingSub).toReference();
         });
 
         expect(listenerCancelled, isFalse);
 
-        ref.dispose();
+        refWithSub.dispose();
         expect(listenerCancelled, isTrue);
+
+        ref.dispose();
       });
     });
 
@@ -1107,7 +1111,7 @@ void main() {
     test('combines multiple lazy values', () {
       final combined = LazyValue.combines(
         [LazyValue.value(1), LazyValue.value(2), LazyValue.value(3)],
-        (values) => values.fold<int>(0, (a, b) => a + b),
+        (values) => values.cast<int>().fold<int>(0, (a, b) => a + b),
       );
 
       expect(combined.get(), 6);

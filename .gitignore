@@ -15,3 +15,6 @@ doc/api/
 .vscode
 .metadata
 .idea
+
+# FVM Version Cache
+.fvm/

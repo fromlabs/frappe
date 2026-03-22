@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'disposable.dart';
 import 'node.dart';
-import 'node_evaluation.dart';
 import 'reference.dart';
 import 'transaction.dart';
 import 'typedefs.dart';

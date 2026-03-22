@@ -5,7 +5,6 @@ import 'node.dart';
 import 'node_evaluation.dart';
 import 'reactive_scope.dart';
 import 'reference.dart';
-import 'typedefs.dart';
 
 typedef TransactionHandler = void Function(Transaction transaction);
 typedef TransactionRunner<T> = T Function(Transaction transaction);
@@ -52,6 +51,31 @@ class Transaction {
       return runner(requiredTransaction);
     }
 
+    late final Transaction transaction;
+    try {
+      transaction = Transaction._();
+      final result = runZoned<T>(
+        () {
+          final result = runner(transaction);
+          transaction._evaluate();
+          transaction._commitValue();
+          transaction._publishValue();
+          transaction._notifyClosingTransaction();
+          return result;
+        },
+        zoneValues: {_transactionZoneParameter: transaction},
+      );
+      return result;
+    } finally {
+      transaction._close();
+    }
+  }
+
+  /// Always creates a new transaction, ignoring any current one.
+  ///
+  /// Used by closing handlers (e.g., switchState) to propagate values
+  /// after relinking nodes.
+  static T runNew<T>(TransactionRunner<T> runner) {
     late final Transaction transaction;
     try {
       transaction = Transaction._();

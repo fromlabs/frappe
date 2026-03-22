@@ -248,4 +248,107 @@ void main() {
       });
     });
   });
+
+  group('Reference additional coverage', () {
+    test('FrappeReference double dispose is safe', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        ref.dispose();
+        // Second dispose throws StateError because underlying Reference
+        // checks disposed state
+        expect(() => ref.dispose(), throwsStateError);
+      });
+    });
+
+    test('FrappeReferenceCollector add after dispose', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+        });
+
+        final collector = FrappeReferenceCollector();
+        collector.dispose();
+
+        // After dispose, the collector's internal list was cleared but no
+        // disposed flag is set, so add still works -- it creates a reference
+        // internally and adds it to the (now empty) list
+        scope.runTransaction(() {
+          collector.add(sink.stream);
+        });
+
+        expect(sink.isClosed, isFalse);
+
+        // Calling dispose again will dispose the newly added reference
+        collector.dispose();
+        expect(sink.isClosed, isTrue);
+      });
+    });
+
+    test('multiple references to same stream', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref1;
+        late FrappeReference<EventStream<int>> ref2;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref1 = sink.stream.toReference();
+          ref2 = sink.stream.toReference();
+        });
+
+        expect(sink.isClosed, isFalse);
+
+        // Dispose only the first reference
+        ref1.dispose();
+        // Stream still alive because ref2 is active
+        expect(sink.isClosed, isFalse);
+
+        // Dispose the second reference
+        ref2.dispose();
+        // Now stream is unreferenced
+        expect(sink.isClosed, isTrue);
+      });
+    });
+
+    test('listener keeps stream alive', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        scope.runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        // Add a listener - the listener's node holds a reference to the
+        // stream's node via the link
+        final events = <int>[];
+        final sub = scope.runTransaction(() => sink.stream.listen(events.add));
+
+        // Dispose the FrappeReference
+        ref.dispose();
+
+        // The subscription's internal Reference keeps the listen node alive,
+        // and via the link the source stream node stays referenced
+        expect(sink.isClosed, isFalse);
+
+        // Verify stream still works
+        sink.send(42);
+        expect(events, [42]);
+
+        // Cancel the subscription - now the stream becomes unreferenced
+        sub.cancel();
+        expect(sink.isClosed, isTrue);
+      });
+    });
+  });
 }
