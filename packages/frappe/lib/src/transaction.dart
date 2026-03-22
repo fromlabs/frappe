@@ -238,7 +238,7 @@ class Transaction {
           'Node value can only be set in opened transaction phase');
     }
     if (!node.isReferenced) {
-      throw ArgumentError('Node $node is not referenced');
+      throw ArgumentError('Node ${node.debugLabel} is not referenced');
     }
     _evaluations[node] = NodeEvaluation<S>(output);
   }
