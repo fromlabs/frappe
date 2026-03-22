@@ -106,9 +106,12 @@ abstract class Node<S> extends Referenceable {
     if (!isReferenced) {
       throw ArgumentError('Unreferenced target node: $this');
     }
-    if (!source.isReferenced) {
-      throw ArgumentError('Unreferenced source node: $source');
-    }
+    // No check on source.isReferenced: the HostedReference created below
+    // will make the source alive through the target's ownership chain.
+    // Sink nodes (EvaluationType.never) are typically unreferenced at this
+    // point — they have no external FrappeReference, only the Dart object
+    // (EventStreamSink/ValueStateSink) holds them. Requiring explicit
+    // referencing of every sink stream was an over-constraint.
     // §8.3: nodes from different scopes must not link — isolation guarantee.
     if (source._scope != _scope) {
       throw ArgumentError(

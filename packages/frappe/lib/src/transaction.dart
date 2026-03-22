@@ -297,10 +297,12 @@ class Transaction {
   }
 
   void _evaluatePendingNodes() {
-    // Priorities are stable during evaluation (updates are deferred), so a
-    // single sort is sufficient to establish correct topological order.
-    _pendingNodes.sort(_priorityComparator);
+    // Re-sort before each extraction because _evaluateNode may append new
+    // nodes (via _evaluateTargetNodes) that were not present during the
+    // previous sort. Without re-sorting, newly appended nodes would be
+    // processed in LIFO order, violating the priority invariant.
     while (_pendingNodes.isNotEmpty) {
+      _pendingNodes.sort(_priorityComparator);
       final pendingNode = _pendingNodes.removeLast();
       _evaluateNode(pendingNode, forceEvaluation: true);
     }
@@ -329,7 +331,7 @@ class Transaction {
       if (forceEvaluation || inputs.allInputsEvaluated) {
         final evaluation = node.evaluate(inputs);
         if (evaluation.isEvaluated) {
-          _evaluations[node] = evaluation;
+            _evaluations[node] = evaluation;
           _pendingNodes.remove(node);
           _evaluateTargetNodes(node);
         }

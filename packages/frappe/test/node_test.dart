@@ -97,7 +97,7 @@ void main() {
       });
     });
 
-    test('link unreferenced source throws', () {
+    test('link unreferenced source becomes alive through target', () {
       scope.run(() {
         late KeyNode<int> source;
 
@@ -105,13 +105,15 @@ void main() {
           source = KeyNode<int>(evaluationType: EvaluationType.never);
         });
 
-        // source is now unreferenced
+        // source is now unreferenced, but linking to a referenced target
+        // makes it alive through the HostedReference ownership chain.
         runTransaction(() {
           final target =
               KeyNode<int>(evaluateHandler: (inputs) => inputs.get<int>());
           final ref = Reference(target);
 
-          expect(() => target.link(source), throwsArgumentError);
+          target.link(source);
+          expect(source.isReferenced, isTrue);
 
           ref.dispose();
         });
