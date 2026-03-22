@@ -439,6 +439,8 @@ Nodes are evaluated in descending `evaluationPriority` order, which corresponds 
 
 Priority is propagated: when a node links to a source, the source's priority increases by the target's priority. This ensures sources always have higher priority than their targets.
 
+**Tiebreaker**: When two nodes have equal priority, the node with the higher ID (created later) is evaluated first. This is a deterministic but arbitrary choice — the spec does not require a specific tiebreaker order, only that it is stable.
+
 **Glitch-freedom theorem**: Under topological evaluation, no node ever sees inconsistent inputs. When a node is evaluated, all its inputs that will fire in this transaction have already been evaluated.
 
 **Proof sketch**: Let node `v` have inputs `{u_1, ..., u_k}`. Since `priority(u_i) > priority(v)` for all `i`, each `u_i` is evaluated before `v` in the priority queue. Therefore `v` sees the final transaction values of all its inputs. QED.
