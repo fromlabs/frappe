@@ -1153,6 +1153,257 @@ void main() {
       expect(cancelled2, isTrue);
     });
   });
+
+  // --- Phase 3: Test coverage gaps ---
+
+  group('switchMap edge cases', () {
+    test('rapid re-switching keeps only latest inner stream', () {
+      scope.run(() {
+        late EventStreamSink<int> selectorSink;
+        late EventStreamSink<String> dataSinkA, dataSinkB, dataSinkC;
+        late FrappeReference<EventStream<int>> selectorRef;
+        late FrappeReference<EventStream<String>> refA, refB, refC;
+
+        runTransaction(() {
+          selectorSink = EventStreamSink<int>();
+          dataSinkA = EventStreamSink<String>();
+          dataSinkB = EventStreamSink<String>();
+          dataSinkC = EventStreamSink<String>();
+          selectorRef = selectorSink.stream.toReference();
+          refA = dataSinkA.stream.toReference();
+          refB = dataSinkB.stream.toReference();
+          refC = dataSinkC.stream.toReference();
+        });
+
+        final events = <String>[];
+        final streams = [dataSinkA.stream, dataSinkB.stream, dataSinkC.stream];
+        final sub = runTransaction(() => selectorSink.stream
+            .switchMap((i) => streams[i])
+            .listen(events.add));
+
+        // Rapid-fire: switch 0 -> 1 -> 2 in quick succession
+        selectorSink.send(0);
+        selectorSink.send(1);
+        selectorSink.send(2);
+
+        // Only stream C (index 2) should be active
+        dataSinkA.send('a');
+        dataSinkB.send('b');
+        dataSinkC.send('c');
+        expect(events, ['c']);
+
+        sub.cancel();
+        selectorRef.dispose();
+        refA.dispose();
+        refB.dispose();
+        refC.dispose();
+      });
+    });
+
+    test('error in mapper does not break graph', () {
+      final errors = <Object>[];
+      final errorScope = FrappeScope(onError: (e, s) => errors.add(e));
+
+      errorScope.run(() {
+        late EventStreamSink<int> sink;
+        late EventStreamSink<String> dataSink;
+        late FrappeReference<EventStream<int>> sinkRef;
+        late FrappeReference<EventStream<String>> dataRef;
+
+        runTransaction(() {
+          sink = EventStreamSink<int>();
+          dataSink = EventStreamSink<String>();
+          sinkRef = sink.stream.toReference();
+          dataRef = dataSink.stream.toReference();
+        });
+
+        final events = <String>[];
+        final sub = runTransaction(() => sink.stream
+            .switchMap((i) {
+              if (i == 99) throw StateError('bad mapper');
+              return dataSink.stream.map((s) => '$s:$i');
+            })
+            .listen(events.add));
+
+        // Normal switch works
+        sink.send(1);
+        dataSink.send('x');
+        expect(events, ['x:1']);
+
+        // Mapper throws — error reported, node stays linked to previous
+        sink.send(99);
+        expect(errors, hasLength(1));
+
+        // Previous inner stream still works after failed switch
+        dataSink.send('y');
+        expect(events, ['x:1', 'y:1']);
+
+        sub.cancel();
+        sinkRef.dispose();
+        dataRef.dispose();
+      });
+
+      errorScope.run(() => errorScope.assertCleanState());
+      errorScope.dispose();
+    });
+  });
+
+  group('switchState edge cases', () {
+    test('mutable inner state transitions propagate correctly', () {
+      scope.run(() {
+        late ValueStateSink<int> innerA, innerB;
+        late ValueStateSink<ValueState<int>> outerSink;
+        late FrappeReference<ValueState<int>> refA, refB;
+        late FrappeReference<ValueState<ValueState<int>>> outerRef;
+
+        runTransaction(() {
+          innerA = ValueStateSink<int>(1);
+          innerB = ValueStateSink<int>(100);
+          refA = innerA.state.toReference();
+          refB = innerB.state.toReference();
+          outerSink = ValueStateSink<ValueState<int>>(innerA.state);
+          outerRef = outerSink.state.toReference();
+        });
+
+        final values = <int>[];
+        final sub = runTransaction(
+            () => ValueState.switchState(outerSink.state).listen(values.add));
+
+        expect(values, [1]); // innerA initial
+
+        // Mutate innerA
+        innerA.send(2);
+        innerA.send(3);
+        expect(values, [1, 2, 3]);
+
+        // Switch to innerB
+        outerSink.send(innerB.state);
+        expect(values, [1, 2, 3, 100]);
+
+        // Mutate innerB
+        innerB.send(200);
+        expect(values, [1, 2, 3, 100, 200]);
+
+        // innerA mutations no longer propagate
+        innerA.send(999);
+        expect(values, [1, 2, 3, 100, 200]);
+
+        // Switch back to innerA — picks up its current value
+        outerSink.send(innerA.state);
+        expect(values, [1, 2, 3, 100, 200, 999]);
+
+        sub.cancel();
+        refA.dispose();
+        refB.dispose();
+        outerRef.dispose();
+      });
+    });
+  });
+
+  group('Reactive feedback loops', () {
+    test('EventStreamLink feedback cycle with accumulate', () {
+      scope.run(() {
+        late EventStreamSink<void> tickSink;
+        late FrappeReference<EventStream<void>> tickRef;
+        late FrappeReference<ValueState<int>> counterRef;
+
+        late ValueState<int> counter;
+        runTransaction(() {
+          tickSink = EventStreamSink<void>();
+          tickRef = tickSink.stream.toReference();
+          counter = tickSink.stream.accumulate<int>(0, (_, count) => count + 1);
+          counterRef = counter.toReference();
+        });
+
+        expect(counter.getValue(), 0);
+
+        tickSink.send(null);
+        expect(counter.getValue(), 1);
+
+        tickSink.send(null);
+        tickSink.send(null);
+        expect(counter.getValue(), 3);
+
+        counterRef.dispose();
+        tickRef.dispose();
+      });
+    });
+
+    test('ValueStateLink feedback cycle', () {
+      scope.run(() {
+        late EventStreamSink<int> addSink;
+        late FrappeReference<EventStream<int>> addRef;
+        late FrappeReference<ValueState<int>> sumRef;
+
+        late ValueState<int> sum;
+        runTransaction(() {
+          addSink = EventStreamSink<int>();
+          addRef = addSink.stream.toReference();
+          final link = ValueStateLink<int>();
+          link.connect(
+              addSink.stream.snapshot(link.state, (e, s) => s + e).toState(0));
+          sum = link.state;
+          sumRef = sum.toReference();
+        });
+
+        expect(sum.getValue(), 0);
+
+        addSink.send(5);
+        expect(sum.getValue(), 5);
+
+        addSink.send(3);
+        expect(sum.getValue(), 8);
+
+        addSink.send(-2);
+        expect(sum.getValue(), 6);
+
+        sumRef.dispose();
+        addRef.dispose();
+      });
+    });
+  });
+
+  group('Transaction error recovery', () {
+    test('error in evaluate handler propagates but does not corrupt state', () {
+      final errors = <Object>[];
+      final errorScope = FrappeScope(onError: (e, s) => errors.add(e));
+
+      errorScope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        final events = <int>[];
+        final sub = runTransaction(() => sink.stream
+            .map((v) {
+              if (v == 42) throw StateError('boom');
+              return v;
+            })
+            .listen(events.add));
+
+        // Normal event works
+        sink.send(1);
+        expect(events, [1]);
+
+        // Throwing mapper — evaluation error propagates out of runTransaction
+        expect(() => sink.send(42), throwsStateError);
+
+        // Subsequent events still work — graph is not corrupted
+        sink.send(2);
+        expect(events, [1, 2]);
+
+        sub.cancel();
+        ref.dispose();
+      });
+
+      errorScope.run(() => errorScope.assertCleanState());
+      errorScope.dispose();
+    });
+  });
 }
 
 class _TrackingSubscription extends ListenSubscription {
