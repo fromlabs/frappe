@@ -510,4 +510,101 @@ void main() {
       errorScope.dispose();
     });
   });
+
+  group('Deferred priority propagation', () {
+    test('priority updates from evaluation-phase links are deferred', () {
+      scope.run(() {
+        // Build a graph where the mapper creates new FRP objects during
+        // evaluation, triggering link() and _propagatePriority while the
+        // transaction is in the evaluation phase.
+        late ValueStateSink<int> sink;
+        late FrappeReference<ValueState<EventStream<int>>> ref;
+
+        runTransaction(() {
+          sink = ValueStateSink<int>(0);
+          // map produces a ValueState<EventStream<int>>; the mapper
+          // creates a new EventStream.map node each time it evaluates.
+          final mapped = sink.state.map(
+              (v) => EventStream<int>.never().map((e) => e * v));
+          ref = mapped.toReference();
+        });
+
+        // Sending a value triggers evaluation which calls the mapper,
+        // creating new linked nodes. This must not corrupt the pending
+        // set — the transaction should complete without error.
+        sink.send(42);
+        sink.send(7);
+
+        ref.dispose();
+      });
+    });
+
+    test('switchMapStream with complex mapper completes correctly', () {
+      scope.run(() {
+        late EventStreamSink<int> source;
+        late ValueStateSink<int> multiplier;
+        late EventStream<int> stream;
+        late FrappeReference<EventStream<int>> ref;
+        final results = <int>[];
+
+        runTransaction(() {
+          source = EventStreamSink<int>();
+          multiplier = ValueStateSink<int>(1);
+
+          // switchMapStream: each multiplier change calls a mapper that
+          // creates new stream nodes during evaluation.
+          stream = multiplier.state.switchMapStream(
+              (m) => source.stream.map((e) => e * m));
+          ref = stream.toReference();
+        });
+
+        final sub = runTransaction(() => stream.listen(results.add));
+
+        source.send(10);
+        expect(results, [10]); // 10 * 1
+
+        multiplier.send(3);
+        source.send(10);
+        expect(results, [10, 30]); // 10 * 3
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+
+    test('evaluation order is correct after deferred priority flush', () {
+      scope.run(() {
+        final order = <String>[];
+        late EventStreamSink<int> sink;
+        late EventStream<int> end;
+        late FrappeReference<EventStream<int>> ref;
+
+        runTransaction(() {
+          sink = EventStreamSink<int>();
+          // Chain: source -> mid -> end. Evaluation must follow
+          // topological order even after priority updates are deferred.
+          final mid = sink.stream.map((e) {
+            order.add('mid');
+            return e + 1;
+          });
+          end = mid.map((e) {
+            order.add('end');
+            return e * 2;
+          });
+          ref = end.toReference();
+        });
+
+        final results = <int>[];
+        final sub = runTransaction(() => end.listen(results.add));
+
+        sink.send(5);
+
+        expect(order, ['mid', 'end']);
+        expect(results, [12]); // (5 + 1) * 2
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+  });
 }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 
 import 'node.dart';
 import 'node_evaluation.dart';
@@ -61,6 +60,7 @@ class Transaction {
         () {
           final result = runner(transaction);
           transaction._evaluate();
+          transaction._flushDeferredPriorityUpdates();
           transaction._commitValue();
           transaction._publishValue();
           transaction._notifyClosingTransaction();
@@ -86,6 +86,7 @@ class Transaction {
         () {
           final result = runner(transaction);
           transaction._evaluate();
+          transaction._flushDeferredPriorityUpdates();
           transaction._commitValue();
           transaction._publishValue();
           transaction._notifyClosingTransaction();
@@ -172,14 +173,17 @@ class Transaction {
 
   final ReferenceGroup _referenceGroup = ReferenceGroup();
   final Map<Node, NodeEvaluation> _evaluations = Map.identity();
-  // Ordered set sorted by descending evaluationPriority so that nodes
-  // closer to the sources (higher priority) are evaluated first, preserving
-  // topological order. When priorities are equal, higher node ID wins as a
-  // deterministic tiebreaker.
-  final Set<Node> _pendingNodes = SplayTreeSet<Node>((node1, node2) {
-    var delta = node2.evaluationPriority - node1.evaluationPriority;
-    return delta != 0 ? delta : node2.id - node1.id;
-  });
+  // Nodes waiting to be evaluated. Uses a List instead of SplayTreeSet
+  // because priority updates are deferred during evaluation (see
+  // _deferOrRunPriorityUpdate), so a self-balancing tree would not see
+  // the mutations anyway. Sorted once before draining in
+  // _evaluatePendingNodes.
+  final List<Node> _pendingNodes = [];
+  // Priority updates deferred from the evaluation phase. When mappers
+  // create FRP objects during evaluation, _propagatePriority is queued
+  // here instead of executing immediately, to avoid mutating priorities
+  // while the pending list is being drained. Flushed after evaluation.
+  final List<void Function()> _deferredPriorityUpdates = [];
 
   TransactionPhase _phase = TransactionPhase.opened;
 
@@ -194,6 +198,14 @@ class Transaction {
   /// premature disposal of nodes involved in the current evaluation cycle.
   void reference<R extends Referenceable>(Node node) =>
       _referenceGroup.add(Reference(node));
+
+  /// Queues a priority update for execution after evaluation completes.
+  ///
+  /// Called by [Node._linkTarget] / [Node._unlinkTarget] when linking
+  /// happens during the evaluation phase (e.g., mapper functions creating
+  /// FRP objects). Deferring prevents mutation of [_pendingNodes] ordering.
+  void deferPriorityUpdate(void Function() update) =>
+      _deferredPriorityUpdates.add(update);
 
   /// Reports a boundary error via the current scope's error handler.
   ///
@@ -258,16 +270,38 @@ class Transaction {
     _evaluatePendingNodes();
   }
 
+  /// Executes priority updates that were deferred during evaluation.
+  ///
+  /// Runs between evaluation and commit so that priorities are correct
+  /// for the next transaction without disturbing the current one.
+  void _flushDeferredPriorityUpdates() {
+    for (final update in _deferredPriorityUpdates) {
+      update();
+    }
+    _deferredPriorityUpdates.clear();
+  }
+
   void _evaluateTargetNodes(Node sourceNode) {
     for (final targetNode in sourceNode.targetNodes.keys) {
       _evaluateNode(targetNode);
     }
   }
 
+  // Ascending comparator: highest evaluationPriority ends up last so that
+  // removeLast() extracts the node that should be evaluated first (closest
+  // to sources). Tiebreaker: highest ID last (matches prior SplayTreeSet
+  // behaviour where higher IDs were evaluated first at equal priority).
+  static int _priorityComparator(Node a, Node b) {
+    final delta = a.evaluationPriority - b.evaluationPriority;
+    return delta != 0 ? delta : a.id - b.id;
+  }
+
   void _evaluatePendingNodes() {
+    // Priorities are stable during evaluation (updates are deferred), so a
+    // single sort is sufficient to establish correct topological order.
+    _pendingNodes.sort(_priorityComparator);
     while (_pendingNodes.isNotEmpty) {
-      final pendingNode = _pendingNodes.first;
-      _pendingNodes.remove(pendingNode);
+      final pendingNode = _pendingNodes.removeLast();
       _evaluateNode(pendingNode, forceEvaluation: true);
     }
   }
@@ -299,7 +333,7 @@ class Transaction {
           _pendingNodes.remove(node);
           _evaluateTargetNodes(node);
         }
-      } else {
+      } else if (!_pendingNodes.contains(node)) {
         _pendingNodes.add(node);
       }
     }

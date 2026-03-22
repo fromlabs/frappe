@@ -141,7 +141,7 @@ abstract class Node<S> extends Referenceable {
       _scope.sourceNodes.add(this);
     }
     targetNodes.putIfAbsent(target, () => Set.identity()).add(key);
-    _propagatePriority(target._evaluationPriority);
+    _deferOrRunPriorityUpdate(target._evaluationPriority);
   }
 
   void _unlinkTarget(Node target, key) {
@@ -154,7 +154,7 @@ abstract class Node<S> extends Referenceable {
           _scope.sourceNodes.remove(this);
         }
       }
-      _propagatePriority(-target._evaluationPriority);
+      _deferOrRunPriorityUpdate(-target._evaluationPriority);
     }
   }
 
@@ -168,6 +168,18 @@ abstract class Node<S> extends Referenceable {
       }
     } else {
       throw ArgumentError('Cycle detected in node link');
+    }
+  }
+
+  // During evaluation, defer priority propagation to avoid mutating
+  // priorities while the pending-nodes list is being drained. Outside
+  // evaluation (opened, closing, or no transaction), run immediately.
+  void _deferOrRunPriorityUpdate(int delta) {
+    final tx = Transaction.currentTransaction;
+    if (tx != null && tx.phase == TransactionPhase.evaluation) {
+      tx.deferPriorityUpdate(() => _propagatePriority(delta));
+    } else {
+      _propagatePriority(delta);
     }
   }
 
