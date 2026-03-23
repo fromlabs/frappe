@@ -12,32 +12,32 @@ class ClearSalePump extends BasePump {
   /// Produces all display outputs plus sale-complete events and beep on clear.
   @override
   Outputs create(Inputs inputs) {
-    // Forward-declare startStream to break the circular dependency:
-    // Fill needs startStream, but it comes from NotifyPointOfSale which
-    // depends on Fill.
-    final startStreamRef = EventStreamLink<Fuel>();
+    // Break the circular dependency: Fill needs startStream, but it comes
+    // from NotifyPointOfSale which depends on Fill.
+    final (_, (fill, notifyPointOfSale)) =
+        EventStream.loopWith((EventStream<Fuel> startSelf) {
+      final fill = Fill(
+        clearAccumulatorStream: inputs.clearSaleStream,
+        fuelsPulsesStream: inputs.fuelPulsesStream,
+        calibrationState: inputs.calibrationState,
+        price1State: inputs.price1State,
+        price2State: inputs.price2State,
+        price3State: inputs.price3State,
+        startStream: startSelf,
+      );
 
-    final fill = Fill(
-      clearAccumulatorStream: inputs.clearSaleStream,
-      fuelsPulsesStream: inputs.fuelPulsesStream,
-      calibrationState: inputs.calibrationState,
-      price1State: inputs.price1State,
-      price2State: inputs.price2State,
-      price3State: inputs.price3State,
-      startStream: startStreamRef.stream,
-    );
+      final notifyPointOfSale = NotifyPointOfSale(
+        lifecycle: Lifecycle(
+          nozzle1Stream: inputs.nozzle1Stream,
+          nozzle2Stream: inputs.nozzle2Stream,
+          nozzle3Stream: inputs.nozzle3Stream,
+        ),
+        fill: fill,
+        clearSaleStream: inputs.clearSaleStream,
+      );
 
-    final notifyPointOfSale = NotifyPointOfSale(
-      lifecycle: Lifecycle(
-        nozzle1Stream: inputs.nozzle1Stream,
-        nozzle2Stream: inputs.nozzle2Stream,
-        nozzle3Stream: inputs.nozzle3Stream,
-      ),
-      fill: fill,
-      clearSaleStream: inputs.clearSaleStream,
-    );
-
-    startStreamRef.connect(notifyPointOfSale.startStream);
+      return (notifyPointOfSale.startStream, (fill, notifyPointOfSale));
+    });
 
     return Outputs.defaults(
       deliveryState:

@@ -15,11 +15,10 @@ class Keypad {
     required EventStream<Unit> clearStream,
     required ValueState<bool> activeState,
   }) {
-    // beepStream is derived inside the loop but exposed as a Keypad output.
-    late EventStream<Unit> beepStream;
-
     // Keypad value resets on clearStream, updates on key press.
-    final valueState = ValueState.loop<int>((self) {
+    // loopWith extracts beepStream built inside the cycle.
+    final (valueState, beepStream) =
+        ValueState.loopWith((ValueState<int> self) {
       // Gate blocks key events when the keypad is inactive (e.g., during slow delivery).
       final validKeyStream = keypadStream.gate(activeState);
 
@@ -50,9 +49,10 @@ class Keypad {
           })
           .mapWhereNotNull();
 
-      beepStream = updateValueStream.mapToUnit();
-
-      return updateValueStream.orElse(clearStream.mapTo(0)).toState(0);
+      return (
+        updateValueStream.orElse(clearStream.mapTo(0)).toState(0),
+        updateValueStream.mapToUnit(),
+      );
     });
 
     return Keypad._(

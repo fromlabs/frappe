@@ -1021,4 +1021,111 @@ void main() {
       });
     });
   });
+
+  group('ValueState.loopWith', () {
+    test('returns looped state and extra output', () {
+      scope.run(() {
+        late EventStreamSink<void> incrementSink;
+        late FrappeReference<EventStream<void>> incrementRef;
+
+        runTransaction(() {
+          incrementSink = EventStreamSink<void>();
+          incrementRef = incrementSink.stream.toReference();
+        });
+
+        // loopWith lets the builder return an extra value alongside the
+        // looped state, eliminating late vars for intermediate signals.
+        final values = <int>[];
+        final resets = <bool>[];
+        late ListenSubscription sub;
+        late ListenSubscription resetSub;
+
+        runTransaction(() {
+          final (counter, resetStream) =
+              ValueState.loopWith((ValueState<int> self) {
+            // Emit true whenever the counter exceeds 2.
+            final reset = incrementSink.stream
+                .snapshot(self, (_, n) => n + 1 > 2);
+            final state = incrementSink.stream
+                .snapshot(self, (_, n) => n + 1)
+                .toState(0);
+            return (state, reset);
+          });
+          sub = counter.listen(values.add);
+          resetSub = resetStream.listen(resets.add);
+        });
+
+        expect(values, [0]);
+
+        incrementSink.send(null);
+        expect(values, [0, 1]);
+        expect(resets, [false]);
+
+        incrementSink.send(null);
+        expect(values, [0, 1, 2]);
+        expect(resets, [false, false]);
+
+        incrementSink.send(null);
+        expect(values, [0, 1, 2, 3]);
+        expect(resets, [false, false, true]);
+
+        sub.cancel();
+        resetSub.cancel();
+        incrementRef.dispose();
+      });
+    });
+
+    test('extra output can be a record with multiple signals', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        // Destructure a nested record to extract multiple intermediate
+        // signals built inside the loop builder.
+        final values = <int>[];
+        final positives = <int>[];
+        final negatives = <int>[];
+        late ListenSubscription sub;
+        late ListenSubscription posSub;
+        late ListenSubscription negSub;
+
+        runTransaction(() {
+          final (accumulated, (posStream, negStream)) =
+              ValueState.loopWith((ValueState<int> self) {
+            final stream =
+                sink.stream.snapshot(self, (event, total) => total + event);
+            return (
+              stream.toState(0),
+              (stream.where((e) => e > 0), stream.where((e) => e < 0)),
+            );
+          });
+          sub = accumulated.listen(values.add);
+          posSub = posStream.listen(positives.add);
+          negSub = negStream.listen(negatives.add);
+        });
+
+        expect(values, [0]);
+
+        sink.send(5);
+        expect(values, [0, 5]);
+        expect(positives, [5]);
+        expect(negatives, isEmpty);
+
+        sink.send(-10);
+        expect(values, [0, 5, -5]);
+        expect(positives, [5]);
+        expect(negatives, [-5]);
+
+        sub.cancel();
+        posSub.cancel();
+        negSub.cancel();
+        ref.dispose();
+      });
+    });
+  });
 }

@@ -118,6 +118,27 @@ class EventStream<E> {
         return link.stream;
       });
 
+  /// Like [loop], but the builder returns a record `(EventStream<E>, R)`.
+  ///
+  /// The first element closes the cycle (connected to `self`);
+  /// the second element is returned alongside the looped stream,
+  /// allowing extraction of intermediate signals without `late` variables.
+  ///
+  /// ```dart
+  /// final (filtered, count) = EventStream.loopWith((EventStream<int> self) {
+  ///   final output = self.where((e) => e > 0);
+  ///   return (inputStream.merge(output), output.accumulate(0, (_, n) => n + 1));
+  /// });
+  /// ```
+  static (EventStream<E>, R) loopWith<E, R>(
+          (EventStream<E>, R) Function(EventStream<E> self) builder) =>
+      Transaction.runRequired((_) {
+        final link = EventStreamLink<E>();
+        final (stream, extra) = builder(link.stream);
+        link.connect(stream);
+        return (link.stream, extra);
+      });
+
   EventStream._(this._node);
 
   /// Merges multiple [streams] into one.

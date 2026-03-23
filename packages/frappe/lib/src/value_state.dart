@@ -114,6 +114,27 @@ class ValueState<V> {
         return link.state;
       });
 
+  /// Like [loop], but the builder returns a record `(ValueState<V>, R)`.
+  ///
+  /// The first element closes the cycle (connected to `self`);
+  /// the second element is returned alongside the looped state,
+  /// allowing extraction of intermediate signals without `late` variables.
+  ///
+  /// ```dart
+  /// final (counter, resetStream) = ValueState.loopWith((ValueState<int> self) {
+  ///   final reset = someStream.snapshot(self, (_, n) => n > 10);
+  ///   return (incrementStream.snapshot(self, (_, n) => n + 1).toState(0), reset);
+  /// });
+  /// ```
+  static (ValueState<V>, R) loopWith<V, R>(
+          (ValueState<V>, R) Function(ValueState<V> self) builder) =>
+      Transaction.runRequired((_) {
+        final link = ValueStateLink<V>();
+        final (state, extra) = builder(link.state);
+        link.connect(state);
+        return (link.state, extra);
+      });
+
   ValueState._(LazyValue<V> lazyInitValue, this._stream)
       : _currentLazyValue = lazyInitValue {
     if (lazyInitValue.hasValue) {

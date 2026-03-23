@@ -1364,4 +1364,52 @@ void main() {
       });
     });
   });
+
+  group('EventStream.loopWith', () {
+    test('returns looped stream and extra output', () {
+      scope.run(() {
+        late EventStreamSink<int> inputSink;
+        late FrappeReference<EventStream<int>> inputRef;
+
+        runTransaction(() {
+          inputSink = EventStreamSink<int>();
+          inputRef = inputSink.stream.toReference();
+        });
+
+        // loopWith returns the looped stream plus an extra signal
+        // built inside the builder — no late vars needed.
+        final events = <int>[];
+        final totals = <int>[];
+        late ListenSubscription sub;
+        late ListenSubscription totalSub;
+
+        runTransaction(() {
+          final (loopStream, totalState) =
+              EventStream.loopWith((EventStream<int> self) {
+            final accumulated = self.toState(0);
+            final output = inputSink.stream
+                .snapshot(accumulated, (event, total) => total + event);
+            return (output, accumulated);
+          });
+          sub = loopStream.listen(events.add);
+          totalSub = totalState.listen(totals.add);
+        });
+
+        expect(events, isEmpty);
+        expect(totals, [0]); // Initial value of accumulated state
+
+        inputSink.send(1);
+        expect(events, [1]);
+        expect(totals, [0, 1]); // Updated after the event
+
+        inputSink.send(2);
+        expect(events, [1, 3]);
+        expect(totals, [0, 1, 3]);
+
+        sub.cancel();
+        totalSub.cancel();
+        inputRef.dispose();
+      });
+    });
+  });
 }

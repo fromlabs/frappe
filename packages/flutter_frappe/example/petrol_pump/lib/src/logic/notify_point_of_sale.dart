@@ -30,27 +30,26 @@ class NotifyPointOfSale {
     required Fill fill,
     required EventStream<Unit> clearSaleStream,
   }) {
-    // startStream/endStream are derived inside the loop but exposed as outputs.
-    late EventStream<Fuel> startStream;
-    late EventStream<Unit> endStream;
-
     // Phase transitions: idle -> filling -> pos -> idle.
-    // The returned ValueState is not used directly -- the loop only establishes
-    // the cycle so that startStream/endStream are gated by the phase.
-    ValueState.loop<_Phase>((self) {
+    // loopWith extracts startStream/endStream gated by the phase cycle.
+    final (_, (startStream, endStream)) =
+        ValueState.loopWith((ValueState<_Phase> self) {
       // Only allow start when idle.
-      startStream = lifecycle.startStream
+      final start = lifecycle.startStream
           .gate(self.map((phase) => phase == _Phase.idle));
 
       // Only allow end when filling.
-      endStream = lifecycle.endStream
+      final end = lifecycle.endStream
           .gate(self.map((phase) => phase == _Phase.filling))
           .mapToUnit();
 
-      return startStream.mapTo(_Phase.filling).orElses([
-        endStream.mapTo(_Phase.pos),
-        clearSaleStream.mapTo(_Phase.idle),
-      ]).toState(_Phase.idle);
+      return (
+        start.mapTo(_Phase.filling).orElses([
+          end.mapTo(_Phase.pos),
+          clearSaleStream.mapTo(_Phase.idle),
+        ]).toState(_Phase.idle),
+        (start, end),
+      );
     });
 
     // Fuel flowing: set on start, cleared on end.
