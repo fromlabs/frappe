@@ -14,57 +14,50 @@ class PresetAmountPump extends BasePump {
   /// Produces all display outputs with preset-controlled speed, keypad, beep, and sale events.
   @override
   Outputs create(Inputs inputs) {
-    // fill and notifyPointOfSale are built inside the loop but used for outputs.
-    late Fill fill;
-    late NotifyPointOfSale notifyPointOfSale;
+    // Forward-declare startStream to break the circular dependency:
+    // Fill needs startStream, but it comes from NotifyPointOfSale which
+    // depends on Fill.
+    final startStreamRef = EventStreamLink<Fuel>();
 
-    // startStream has a cyclic dependency: Fill needs it, but it comes from
-    // NotifyPointOfSale which depends on Fill.
-    EventStream.loop<Fuel>((self) {
-      fill = Fill(
-        clearAccumulatorStream: inputs.clearSaleStream,
-        fuelsPulsesStream: inputs.fuelPulsesStream,
-        calibrationState: inputs.calibrationState,
-        price1State: inputs.price1State,
-        price2State: inputs.price2State,
-        price3State: inputs.price3State,
-        startStream: self,
-      );
+    final fill = Fill(
+      clearAccumulatorStream: inputs.clearSaleStream,
+      fuelsPulsesStream: inputs.fuelPulsesStream,
+      calibrationState: inputs.calibrationState,
+      price1State: inputs.price1State,
+      price2State: inputs.price2State,
+      price3State: inputs.price3State,
+      startStream: startStreamRef.stream,
+    );
 
-      notifyPointOfSale = NotifyPointOfSale(
-        lifecycle: Lifecycle(
-          nozzle1Stream: inputs.nozzle1Stream,
-          nozzle2Stream: inputs.nozzle2Stream,
-          nozzle3Stream: inputs.nozzle3Stream,
-        ),
-        fill: fill,
-        clearSaleStream: inputs.clearSaleStream,
-      );
+    final notifyPointOfSale = NotifyPointOfSale(
+      lifecycle: Lifecycle(
+        nozzle1Stream: inputs.nozzle1Stream,
+        nozzle2Stream: inputs.nozzle2Stream,
+        nozzle3Stream: inputs.nozzle3Stream,
+      ),
+      fill: fill,
+      clearSaleStream: inputs.clearSaleStream,
+    );
 
-      return notifyPointOfSale.startStream;
-    });
+    startStreamRef.connect(notifyPointOfSale.startStream);
 
-    // keypad and preset are built inside the loop but used for outputs.
-    late Keypad keypad;
-    late Preset preset;
+    // Forward-declare isKeypadActive to break the circular dependency:
+    // Keypad needs it, but it comes from Preset which depends on Keypad.
+    final isKeypadActiveStateRef = ValueStateLink<bool>();
 
-    // isKeypadActive has a cyclic dependency: Keypad needs it, but it comes
-    // from Preset which depends on Keypad.
-    ValueState.loop<bool>((self) {
-      keypad = Keypad(
-        keypadStream: inputs.keypadStream,
-        clearStream: inputs.clearSaleStream,
-        activeState: self,
-      );
+    final keypad = Keypad(
+      keypadStream: inputs.keypadStream,
+      clearStream: inputs.clearSaleStream,
+      activeState: isKeypadActiveStateRef.state,
+    );
 
-      preset = Preset(
-        fill: fill,
-        presetDollarsState: keypad.valueState,
-        fuelFlowingState: notifyPointOfSale.fuelFlowingState,
-      );
+    final preset = Preset(
+      fill: fill,
+      presetDollarsState: keypad.valueState,
+      fuelFlowingState: notifyPointOfSale.fuelFlowingState,
+    );
 
-      return preset.isKeypadActiveState;
-    });
+    isKeypadActiveStateRef.connect(preset.isKeypadActiveState);
 
     final beepStream = notifyPointOfSale.beepStream.orElse(keypad.beepStream);
 
