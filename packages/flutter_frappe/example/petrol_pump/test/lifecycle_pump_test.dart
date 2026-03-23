@@ -21,8 +21,7 @@ void main() {
           final pump = LifecyclePump();
           final outputs = pump.create(Inputs.defaults());
           final refs = FrappeReferenceCollector();
-          refs.add(outputs.deliveryState);
-          refs.add(outputs.saleCostLcdState);
+          outputs.hold(refs);
 
           expect(outputs.deliveryState.getValue(), Delivery.off);
           expect(outputs.saleCostLcdState.getValue(), '');
@@ -39,18 +38,15 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          nozzle1Sink = EventStreamSink<UpDown>();
-
           refs = FrappeReferenceCollector();
-          refs.add(nozzle1Sink.stream);
+          nozzle1Sink = refs.addStreamSink<UpDown>();
 
           final pump = LifecyclePump();
           outputs = pump.create(Inputs.defaults(
             nozzle1Stream: nozzle1Sink.stream,
           ));
 
-          refs.add(outputs.deliveryState);
-          refs.add(outputs.saleCostLcdState);
+          outputs.hold(refs);
         });
 
         nozzle1Sink.send(UpDown.up);
@@ -72,18 +68,15 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          nozzle2Sink = EventStreamSink<UpDown>();
-
           refs = FrappeReferenceCollector();
-          refs.add(nozzle2Sink.stream);
+          nozzle2Sink = refs.addStreamSink<UpDown>();
 
           final pump = LifecyclePump();
           outputs = pump.create(Inputs.defaults(
             nozzle2Stream: nozzle2Sink.stream,
           ));
 
-          refs.add(outputs.deliveryState);
-          refs.add(outputs.saleCostLcdState);
+          outputs.hold(refs);
         });
 
         nozzle2Sink.send(UpDown.up);
@@ -102,18 +95,15 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          nozzle3Sink = EventStreamSink<UpDown>();
-
           refs = FrappeReferenceCollector();
-          refs.add(nozzle3Sink.stream);
+          nozzle3Sink = refs.addStreamSink<UpDown>();
 
           final pump = LifecyclePump();
           outputs = pump.create(Inputs.defaults(
             nozzle3Stream: nozzle3Sink.stream,
           ));
 
-          refs.add(outputs.deliveryState);
-          refs.add(outputs.saleCostLcdState);
+          outputs.hold(refs);
         });
 
         nozzle3Sink.send(UpDown.up);

@@ -11,21 +11,16 @@ ValueState<double> accumulate(
   EventStream<int> deltaStream,
   ValueState<double> calibrationState,
 ) {
-  // ValueStateLink breaks the cyclic dependency: the running total
-  // references itself (previous value + delta) so it must be
-  // forward-declared and connected after construction.
-  final totalStateRef = ValueStateLink<double>();
-
-  // On clear, reset to 0; on delta, add to the current total.
-  // orElse gives clear priority over delta within the same transaction.
-  totalStateRef.connect(clearAccumulatorStream
+  // loop breaks the cyclic dependency: the running total references itself
+  // (previous value + delta). On clear, reset to 0; on delta, add to
+  // the current total. orElse gives clear priority within the same transaction.
+  final totalState = ValueState.loop<double>((self) => clearAccumulatorStream
       .mapTo(0.0)
-      .orElse(deltaStream.snapshot(
-          totalStateRef.state, (delta, total) => total + delta))
+      .orElse(deltaStream.snapshot(self, (delta, total) => total + delta))
       .toState(0.0));
 
   // Apply calibration factor to convert raw pulse count to liters.
-  return totalStateRef.state.combine(
+  return totalState.combine(
     calibrationState,
     (total, calibration) => total * calibration,
   );

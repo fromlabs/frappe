@@ -38,41 +38,40 @@ class Lifecycle {
     required EventStream<UpDown> nozzle2Stream,
     required EventStream<UpDown> nozzle3Stream,
   }) {
-    // ValueStateLink breaks the cyclic dependency: startStream/endStream
-    // depend on fillActiveState, but fillActiveState is derived from them.
-    // The link provides a forward-declared state that is connected later.
-    final fillActiveStateRef = ValueStateLink<Fuel?>();
+    // startStream/endStream depend on fillActiveState, but fillActiveState is
+    // derived from them. late vars capture them from inside the loop builder.
+    late EventStream<Fuel> startStream;
+    late EventStream<Unit> endStream;
 
-    // A nozzle can only start filling if no other nozzle is already active.
-    final startStream = _whenLifted(nozzle1Stream, Fuel.one)
-        .orElses([
-          _whenLifted(nozzle2Stream, Fuel.two),
-          _whenLifted(nozzle3Stream, Fuel.three),
-        ])
-        .snapshot<Fuel?, Fuel?>(
-            fillActiveStateRef.state,
-            (newFuel, fillActive) =>
-                fillActive == null ? newFuel : null)
-        .mapWhereNotNull();
-
-    final endStream =
-        _whenSetDown(nozzle1Stream, Fuel.one, fillActiveStateRef.state)
-            .orElses([
-      _whenSetDown(nozzle2Stream, Fuel.two, fillActiveStateRef.state),
-      _whenSetDown(nozzle3Stream, Fuel.three, fillActiveStateRef.state),
-    ]);
-
-    // Close the cycle: connect the forward-declared state to its definition.
     // Fill active tracks which nozzle is up; cleared on end, set on start.
-    fillActiveStateRef.connect(endStream
-        .mapTo<Fuel?>(null)
-        .orElse(startStream.map<Fuel?>((e) => e))
-        .toState(null));
+    final fillActiveState = ValueState.loop<Fuel?>((self) {
+      // A nozzle can only start filling if no other nozzle is already active.
+      startStream = _whenLifted(nozzle1Stream, Fuel.one)
+          .orElses([
+            _whenLifted(nozzle2Stream, Fuel.two),
+            _whenLifted(nozzle3Stream, Fuel.three),
+          ])
+          .snapshot<Fuel?, Fuel?>(
+              self,
+              (newFuel, fillActive) =>
+                  fillActive == null ? newFuel : null)
+          .mapWhereNotNull();
+
+      endStream = _whenSetDown(nozzle1Stream, Fuel.one, self).orElses([
+        _whenSetDown(nozzle2Stream, Fuel.two, self),
+        _whenSetDown(nozzle3Stream, Fuel.three, self),
+      ]);
+
+      return endStream
+          .mapTo<Fuel?>(null)
+          .orElse(startStream.map<Fuel?>((e) => e))
+          .toState(null);
+    });
 
     return Lifecycle._(
       startStream: startStream,
       endStream: endStream,
-      fillActiveState: fillActiveStateRef.state,
+      fillActiveState: fillActiveState,
     );
   }
 

@@ -2,35 +2,6 @@ import 'package:petrol_pump/petrol_pump.dart';
 import 'package:frappe/frappe.dart';
 import 'package:test/test.dart';
 
-/// Flattens a state-of-outputs into a single [Outputs] by switch-mapping
-/// each output field individually and deduplicating with [distinct].
-Outputs _switchOutputs(ValueState<Outputs> outputsState) => Outputs(
-      deliveryState: outputsState
-          .switchMapState<Delivery>((o) => o.deliveryState)
-          .distinct(),
-      saleCostLcdState: outputsState
-          .switchMapState<String>((o) => o.saleCostLcdState)
-          .distinct(),
-      presetLcdState: outputsState
-          .switchMapState<String>((o) => o.presetLcdState)
-          .distinct(),
-      saleQuantityLcdState: outputsState
-          .switchMapState<String>((o) => o.saleQuantityLcdState)
-          .distinct(),
-      priceLcd1State: outputsState
-          .switchMapState<String>((o) => o.priceLcd1State)
-          .distinct(),
-      priceLcd2State: outputsState
-          .switchMapState<String>((o) => o.priceLcd2State)
-          .distinct(),
-      priceLcd3State: outputsState
-          .switchMapState<String>((o) => o.priceLcd3State)
-          .distinct(),
-      beepStream: outputsState.switchMapStream<Unit>((o) => o.beepStream),
-      saleCompleteStream:
-          outputsState.switchMapStream<Sale>((o) => o.saleCompleteStream),
-    );
-
 void main() {
   // Integration tests for the petrol pump logic.
   // These tests use simulators with async cleanup, so FrappeScope
@@ -80,28 +51,16 @@ void main() {
       refs = FrappeReferenceCollector();
 
       runTransaction(() {
-        fuelPulsesStreamRef = EventStreamLink<int>();
-        clearSaleStreamRef = EventStreamLink<Unit>();
-        nozzle1StreamSink = EventStreamSink<UpDown>();
-        nozzle2StreamSink = EventStreamSink<UpDown>();
-        nozzle3StreamSink = EventStreamSink<UpDown>();
-        keypadStreamSink = EventStreamSink<NumericKey>();
-        calibrationStateSink = ValueStateSink<double>(0.001);
-        price1StateSink = ValueStateSink<double>(2.149);
-        price2StateSink = ValueStateSink<double>(2.341);
-        price3StateSink = ValueStateSink<double>(1.499);
-
-        // Keep sink streams alive via references.
-        refs.add(fuelPulsesStreamRef.stream);
-        refs.add(clearSaleStreamRef.stream);
-        refs.add(nozzle1StreamSink.stream);
-        refs.add(nozzle2StreamSink.stream);
-        refs.add(nozzle3StreamSink.stream);
-        refs.add(keypadStreamSink.stream);
-        refs.add(calibrationStateSink.state);
-        refs.add(price1StateSink.state);
-        refs.add(price2StateSink.state);
-        refs.add(price3StateSink.state);
+        fuelPulsesStreamRef = refs.addStreamLink<int>();
+        clearSaleStreamRef = refs.addStreamLink<Unit>();
+        nozzle1StreamSink = refs.addStreamSink<UpDown>();
+        nozzle2StreamSink = refs.addStreamSink<UpDown>();
+        nozzle3StreamSink = refs.addStreamSink<UpDown>();
+        keypadStreamSink = refs.addStreamSink<NumericKey>();
+        calibrationStateSink = refs.addStateSink<double>(0.001);
+        price1StateSink = refs.addStateSink<double>(2.149);
+        price2StateSink = refs.addStateSink<double>(2.341);
+        price3StateSink = refs.addStateSink<double>(1.499);
 
         final pump = PresetAmountPump();
 
@@ -118,15 +77,7 @@ void main() {
           clearSaleStream: clearSaleStreamRef.stream,
         ));
 
-        refs.add(outputs.deliveryState);
-        refs.add(outputs.saleCostLcdState);
-        refs.add(outputs.presetLcdState);
-        refs.add(outputs.saleQuantityLcdState);
-        refs.add(outputs.priceLcd1State);
-        refs.add(outputs.priceLcd2State);
-        refs.add(outputs.priceLcd3State);
-        refs.add(outputs.beepStream);
-        refs.add(outputs.saleCompleteStream);
+        outputs.hold(refs);
 
         pumpEngineSimulator =
             PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
@@ -244,29 +195,17 @@ void main() {
       refs = FrappeReferenceCollector();
 
       runTransaction(() {
-        fuelPulsesStreamLink = EventStreamLink<int>();
-        clearSaleStreamLink = EventStreamLink<Unit>();
-        nozzle1StreamSink = EventStreamSink<UpDown>();
-        nozzle2StreamSink = EventStreamSink<UpDown>();
-        nozzle3StreamSink = EventStreamSink<UpDown>();
-        keypadStreamSink = EventStreamSink<NumericKey>();
-        calibrationStateSink = ValueStateSink<double>(0.001);
-        price1StateSink = ValueStateSink<double>(2.149);
-        price2StateSink = ValueStateSink<double>(2.341);
-        price3StateSink = ValueStateSink<double>(1.499);
-        pumpLogicStateSink = ValueStateSink<Pump?>(null);
-
-        refs.add(fuelPulsesStreamLink.stream);
-        refs.add(clearSaleStreamLink.stream);
-        refs.add(nozzle1StreamSink.stream);
-        refs.add(nozzle2StreamSink.stream);
-        refs.add(nozzle3StreamSink.stream);
-        refs.add(keypadStreamSink.stream);
-        refs.add(calibrationStateSink.state);
-        refs.add(price1StateSink.state);
-        refs.add(price2StateSink.state);
-        refs.add(price3StateSink.state);
-        refs.add(pumpLogicStateSink.state);
+        fuelPulsesStreamLink = refs.addStreamLink<int>();
+        clearSaleStreamLink = refs.addStreamLink<Unit>();
+        nozzle1StreamSink = refs.addStreamSink<UpDown>();
+        nozzle2StreamSink = refs.addStreamSink<UpDown>();
+        nozzle3StreamSink = refs.addStreamSink<UpDown>();
+        keypadStreamSink = refs.addStreamSink<NumericKey>();
+        calibrationStateSink = refs.addStateSink<double>(0.001);
+        price1StateSink = refs.addStateSink<double>(2.149);
+        price2StateSink = refs.addStateSink<double>(2.341);
+        price3StateSink = refs.addStateSink<double>(1.499);
+        pumpLogicStateSink = refs.addStateSink<Pump?>(null);
 
         final outputsState = pumpLogicStateSink.state.map((pump) {
           if (pump != null) {
@@ -287,17 +226,9 @@ void main() {
           }
         });
 
-        outputs = _switchOutputs(outputsState);
+        outputs = Outputs.switchFrom(outputsState);
 
-        refs.add(outputs.deliveryState);
-        refs.add(outputs.saleCostLcdState);
-        refs.add(outputs.presetLcdState);
-        refs.add(outputs.saleQuantityLcdState);
-        refs.add(outputs.priceLcd1State);
-        refs.add(outputs.priceLcd2State);
-        refs.add(outputs.priceLcd3State);
-        refs.add(outputs.beepStream);
-        refs.add(outputs.saleCompleteStream);
+        outputs.hold(refs);
 
         pumpEngineSimulator =
             PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);

@@ -98,6 +98,26 @@ class EventStream<E> {
   EventStream.never()
       : _node = KeyNode<E>(evaluationType: EvaluationType.never);
 
+  /// Creates a self-referential stream for cyclic dependencies.
+  ///
+  /// The [builder] receives a forward-declared stream (`self`) that can be
+  /// used in expressions before its definition is known. The builder must
+  /// return the actual [EventStream] that `self` will resolve to.
+  ///
+  /// ```dart
+  /// final filtered = EventStream.loop<Fuel>((self) {
+  ///   final result = process(self);
+  ///   return result.outputStream;
+  /// });
+  /// ```
+  static EventStream<E> loop<E>(
+          EventStream<E> Function(EventStream<E> self) builder) =>
+      Transaction.runRequired((_) {
+        final link = EventStreamLink<E>();
+        link.connect(builder(link.stream));
+        return link.stream;
+      });
+
   EventStream._(this._node);
 
   /// Merges multiple [streams] into one.
@@ -240,21 +260,14 @@ class EventStream<E> {
 
   /// Accumulates a state over events.
   ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) =>
-      Transaction.runRequired((_) {
-        final link = ValueStateLink<V>();
-        link.connect(snapshot(link.state, accumulator).toState(initValue));
-        return link.state;
-      });
+      ValueState.loop<V>(
+          (self) => snapshot(self, accumulator).toState(initValue));
 
   /// Accumulates a state with lazy initial value.
   ValueState<V> accumulateLazy<V>(
           LazyValue<V> lazyInitValue, Accumulator<E, V> accumulator) =>
-      Transaction.runRequired((_) {
-        final link = ValueStateLink<V>();
-        link.connect(
-            snapshot(link.state, accumulator).toStateLazy(lazyInitValue));
-        return link.state;
-      });
+      ValueState.loop<V>(
+          (self) => snapshot(self, accumulator).toStateLazy(lazyInitValue));
 
   /// Collects events with stateful transformation.
   EventStream<ER> collect<ER, V>(V initValue, Collector<E, V, ER> collector) =>

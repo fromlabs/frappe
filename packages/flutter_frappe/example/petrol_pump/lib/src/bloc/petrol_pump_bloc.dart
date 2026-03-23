@@ -106,101 +106,66 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
       _clearSaleStreamSink = EventStreamSink();
       _keypadStreamSink = EventStreamSink();
       _priceSettingStateSinks = [
-        ValueStateSink<double>(2.149),
-        ValueStateSink<double>(2.341),
-        ValueStateSink<double>(1.499),
+        _references.addStateSink<double>(2.149),
+        _references.addStateSink<double>(2.341),
+        _references.addStateSink<double>(1.499),
       ];
 
-      final fuelPulsesStreamLink = EventStreamLink<int>();
-      _references.add(fuelPulsesStreamLink.stream);
+      final fuelPulsesStreamLink = _references.addStreamLink<int>();
 
-      _priceSettingStates = _priceSettingStateSinks
-          .map((sink) => _references.add(sink.state))
-          .toList();
+      _priceSettingStates =
+          _priceSettingStateSinks.map((sink) => sink.state).toList();
 
       // Create 3 nozzle toggle states with cyclic feedback.
-      // Each nozzle uses a ValueStateLink for forward-declaration: the
-      // toggle stream snapshots the nozzle's own current value to flip it,
-      // creating a self-referential cycle that the link resolves.
+      // Each nozzle snapshots its own current value to flip it on toggle.
       _nozzleStates = List.generate(3, (i) {
         final number = i + 1;
-        final nozzleStateRef = ValueStateLink<UpDown>();
-
-        nozzleStateRef.connect(_toggleNozzleStreamSink.stream
-            .where((nozzle) => nozzle == number)
-            .snapshot(nozzleStateRef.state,
-                (_, nozzle) => nozzle == UpDown.up ? UpDown.down : UpDown.up)
-            .toState(UpDown.down));
-
-        return _references.add(nozzleStateRef.state);
+        return _references.add(ValueState.loop<UpDown>((self) =>
+            _toggleNozzleStreamSink.stream
+                .where((nozzle) => nozzle == number)
+                .snapshot(self,
+                    (_, nozzle) => nozzle == UpDown.up ? UpDown.down : UpDown.up)
+                .toState(UpDown.down)));
       });
 
-      // These derived streams live across transactions (captured in the map
-      // closure below, evaluated when setPumpLogic fires). They must be
-      // referenced to prevent onUnreferenced from disconnecting them
-      // from their source states between the creation and evaluation.
-      final nozzle1Stream = _references.add(_nozzleStates[0].toUpdates());
-      final nozzle2Stream = _references.add(_nozzleStates[1].toUpdates());
-      final nozzle3Stream = _references.add(_nozzleStates[2].toUpdates());
+      final calibrationStateSink = _references.addStateSink<double>(0.001);
 
-      final calibrationStateSink = ValueStateSink<double>(0.001);
-      _references.add(calibrationStateSink.state);
+      // Build shared inputs once and own them so the derived streams
+      // (toUpdates, sink streams) survive across transactions — they are
+      // captured in the map closure below and evaluated when setPumpLogic fires.
+      final sharedInputs = Inputs.defaults(
+        nozzle1Stream: _nozzleStates[0].toUpdates(),
+        nozzle2Stream: _nozzleStates[1].toUpdates(),
+        nozzle3Stream: _nozzleStates[2].toUpdates(),
+        keypadStream: _keypadStreamSink.stream,
+        fuelPulsesStream: fuelPulsesStreamLink.stream,
+        calibrationState: calibrationStateSink.state,
+        price1State: _priceSettingStateSinks[0].state,
+        price2State: _priceSettingStateSinks[1].state,
+        price3State: _priceSettingStateSinks[2].state,
+        clearSaleStream: _clearSaleStreamSink.stream,
+      ).hold(_references);
 
       // Map the selected pump logic to outputs via switchMapState.
       final outputsState = _pumpLogicStateSink.state.map((pump) {
         if (pump != null) {
-          return pump.create(Inputs.defaults(
-            nozzle1Stream: nozzle1Stream,
-            nozzle2Stream: nozzle2Stream,
-            nozzle3Stream: nozzle3Stream,
-            keypadStream: _keypadStreamSink.stream,
-            fuelPulsesStream: fuelPulsesStreamLink.stream,
-            calibrationState: calibrationStateSink.state,
-            price1State: _priceSettingStateSinks[0].state,
-            price2State: _priceSettingStateSinks[1].state,
-            price3State: _priceSettingStateSinks[2].state,
-            clearSaleStream: _clearSaleStreamSink.stream,
-          ));
+          return pump.create(sharedInputs);
         } else {
           return Outputs.defaults();
         }
       });
 
       // Switch each output field through the dynamic pump logic.
-      // switchMapState/switchMapStream re-subscribes to the inner state
-      // whenever the pump logic changes, so swapping algorithms at runtime
-      // seamlessly redirects all output bindings.
-      final outputs = Outputs(
-        deliveryState: outputsState
-            .switchMapState((outputs) => outputs.deliveryState)
-            .distinct(),
-        saleCostLcdState: outputsState
-            .switchMapState((outputs) => outputs.saleCostLcdState)
-            .distinct(),
-        presetLcdState: outputsState
-            .switchMapState((outputs) => outputs.presetLcdState)
-            .distinct(),
-        saleQuantityLcdState: outputsState
-            .switchMapState((outputs) => outputs.saleQuantityLcdState)
-            .distinct(),
-        priceLcd1State: outputsState
-            .switchMapState((outputs) => outputs.priceLcd1State)
-            .distinct(),
-        priceLcd2State: outputsState
-            .switchMapState((outputs) => outputs.priceLcd2State)
-            .distinct(),
-        priceLcd3State: outputsState
-            .switchMapState((outputs) => outputs.priceLcd3State)
-            .distinct(),
-        beepStream:
-            outputsState.switchMapStream((outputs) => outputs.beepStream),
-        saleCompleteStream: outputsState
-            .switchMapStream((outputs) => outputs.saleCompleteStream),
-      );
+      // Swapping algorithms at runtime seamlessly redirects all output bindings.
+      final outputs = Outputs.switchFrom(outputsState);
 
       _pumpEngineSimulator =
           PumpEngineSimulatorImpl(deliveryState: outputs.deliveryState);
       fuelPulsesStreamLink.connect(_pumpEngineSimulator.fuelPulsesStream);
+
+      // Own all raw output fields in one call; the mapped derivations
+      // below still need individual add() since they are BLoC-specific.
+      outputs.hold(_references);
 
       _priceStates = [
         _references.add(outputs.priceLcd1State.map(_fromLcdMapper)),
@@ -215,9 +180,9 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
       _saleQuantityState =
           _references.add(outputs.saleQuantityLcdState.map(_fromLcdMapper));
 
-      _saleCompleteStream = _references.add(outputs.saleCompleteStream);
-      _beepStream = _references.add(outputs.beepStream);
-      _deliveryState = _references.add(outputs.deliveryState);
+      _saleCompleteStream = outputs.saleCompleteStream;
+      _beepStream = outputs.beepStream;
+      _deliveryState = outputs.deliveryState;
 
       _subscriptions = outputs.saleCostLcdState.listen(print);
     });

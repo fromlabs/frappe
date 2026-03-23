@@ -41,8 +41,7 @@ void main() {
           );
 
           final refs = FrappeReferenceCollector();
-          refs.add(npos.fillActiveState);
-          refs.add(npos.fuelFlowingState);
+          npos.hold(refs);
 
           expect(npos.fillActiveState.getValue(), isNull);
           expect(npos.fuelFlowingState.getValue(), isNull);
@@ -59,14 +58,10 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          nozzle1Sink = EventStreamSink<UpDown>();
-          final clearSaleSink = EventStreamSink<Unit>();
-          final startStreamLink = EventStreamLink<Fuel>();
-
           refs = FrappeReferenceCollector();
-          refs.add(nozzle1Sink.stream);
-          refs.add(clearSaleSink.stream);
-          refs.add(startStreamLink.stream);
+          nozzle1Sink = refs.addStreamSink<UpDown>();
+          final clearSaleSink = refs.addStreamSink<Unit>();
+          final startStreamLink = refs.addStreamLink<Fuel>();
 
           final lifecycle = Lifecycle(
             nozzle1Stream: nozzle1Sink.stream,
@@ -91,9 +86,7 @@ void main() {
           );
 
           startStreamLink.connect(npos.startStream);
-          refs.add(npos.fillActiveState);
-          refs.add(npos.fuelFlowingState);
-          refs.add(npos.saleCompleteStream);
+          npos.hold(refs);
         });
 
         // Lift nozzle 1.
@@ -112,14 +105,10 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          nozzle1Sink = EventStreamSink<UpDown>();
-          final clearSaleSink = EventStreamSink<Unit>();
-          final startStreamLink = EventStreamLink<Fuel>();
-
           refs = FrappeReferenceCollector();
-          refs.add(nozzle1Sink.stream);
-          refs.add(clearSaleSink.stream);
-          refs.add(startStreamLink.stream);
+          nozzle1Sink = refs.addStreamSink<UpDown>();
+          final clearSaleSink = refs.addStreamSink<Unit>();
+          final startStreamLink = refs.addStreamLink<Fuel>();
 
           final lifecycle = Lifecycle(
             nozzle1Stream: nozzle1Sink.stream,
@@ -144,9 +133,7 @@ void main() {
           );
 
           startStreamLink.connect(npos.startStream);
-          refs.add(npos.fillActiveState);
-          refs.add(npos.fuelFlowingState);
-          refs.add(npos.saleCompleteStream);
+          npos.hold(refs);
         });
 
         nozzle1Sink.send(UpDown.up);
@@ -168,14 +155,10 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          nozzle1Sink = EventStreamSink<UpDown>();
-          clearSaleSink = EventStreamSink<Unit>();
-          final startStreamLink = EventStreamLink<Fuel>();
-
           refs = FrappeReferenceCollector();
-          refs.add(nozzle1Sink.stream);
-          refs.add(clearSaleSink.stream);
-          refs.add(startStreamLink.stream);
+          nozzle1Sink = refs.addStreamSink<UpDown>();
+          clearSaleSink = refs.addStreamSink<Unit>();
+          final startStreamLink = refs.addStreamLink<Fuel>();
 
           final lifecycle = Lifecycle(
             nozzle1Stream: nozzle1Sink.stream,
@@ -200,9 +183,7 @@ void main() {
           );
 
           startStreamLink.connect(npos.startStream);
-          refs.add(npos.fillActiveState);
-          refs.add(npos.fuelFlowingState);
-          refs.add(npos.saleCompleteStream);
+          npos.hold(refs);
         });
 
         // Complete a fill cycle.
@@ -233,16 +214,11 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          nozzle1Sink = EventStreamSink<UpDown>();
-          pulsesSink = EventStreamSink<int>();
-          clearSaleSink = EventStreamSink<Unit>();
-          final startStreamLink = EventStreamLink<Fuel>();
-
           refs = FrappeReferenceCollector();
-          refs.add(nozzle1Sink.stream);
-          refs.add(pulsesSink.stream);
-          refs.add(clearSaleSink.stream);
-          refs.add(startStreamLink.stream);
+          nozzle1Sink = refs.addStreamSink<UpDown>();
+          pulsesSink = refs.addStreamSink<int>();
+          clearSaleSink = refs.addStreamSink<Unit>();
+          final startStreamLink = refs.addStreamLink<Fuel>();
 
           final lifecycle = Lifecycle(
             nozzle1Stream: nozzle1Sink.stream,
@@ -267,9 +243,7 @@ void main() {
           );
 
           startStreamLink.connect(npos.startStream);
-          refs.add(npos.fillActiveState);
-          refs.add(npos.fuelFlowingState);
-          refs.add(npos.saleCompleteStream);
+          npos.hold(refs);
         });
 
         final sales = <Sale>[];
@@ -306,14 +280,10 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          nozzle1Sink = EventStreamSink<UpDown>();
-          clearSaleSink = EventStreamSink<Unit>();
-          final startStreamLink = EventStreamLink<Fuel>();
-
           refs = FrappeReferenceCollector();
-          refs.add(nozzle1Sink.stream);
-          refs.add(clearSaleSink.stream);
-          refs.add(startStreamLink.stream);
+          nozzle1Sink = refs.addStreamSink<UpDown>();
+          clearSaleSink = refs.addStreamSink<Unit>();
+          final startStreamLink = refs.addStreamLink<Fuel>();
 
           final lifecycle = Lifecycle(
             nozzle1Stream: nozzle1Sink.stream,
@@ -338,9 +308,7 @@ void main() {
           );
 
           startStreamLink.connect(npos.startStream);
-          refs.add(npos.fillActiveState);
-          refs.add(npos.fuelFlowingState);
-          refs.add(npos.saleCompleteStream);
+          npos.hold(refs);
         });
 
         // Complete a fill — enter pos phase.

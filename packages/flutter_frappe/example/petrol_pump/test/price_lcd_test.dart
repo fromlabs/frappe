@@ -90,10 +90,8 @@ void main() {
         final refs = FrappeReferenceCollector();
 
         runTransaction(() {
-          fillActiveSink = ValueStateSink<Fuel?>(null);
+          fillActiveSink = refs.addStateSink<Fuel?>(null);
           final priceState = ValueState.constant(5.0);
-
-          refs.add(fillActiveSink.state);
 
           final inputs = Inputs.defaults(
             price1State: ValueState.constant(2.149),

@@ -96,6 +96,24 @@ class ValueState<V> {
   ValueState.constant(V initValue)
       : this._(LazyValue.value(initValue), EventStream<V>.never());
 
+  /// Creates a self-referential state for cyclic dependencies.
+  ///
+  /// The [builder] receives a forward-declared state (`self`) that can be
+  /// used in expressions before its definition is known. The builder must
+  /// return the actual [ValueState] that `self` will resolve to.
+  ///
+  /// ```dart
+  /// final counter = ValueState.loop<int>((self) =>
+  ///     incrementStream.snapshot(self, (_, n) => n + 1).toState(0));
+  /// ```
+  static ValueState<V> loop<V>(
+          ValueState<V> Function(ValueState<V> self) builder) =>
+      Transaction.runRequired((_) {
+        final link = ValueStateLink<V>();
+        link.connect(builder(link.state));
+        return link.state;
+      });
+
   ValueState._(LazyValue<V> lazyInitValue, this._stream)
       : _currentLazyValue = lazyInitValue {
     if (lazyInitValue.hasValue) {

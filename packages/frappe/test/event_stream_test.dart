@@ -1319,4 +1319,49 @@ void main() {
       });
     });
   });
+
+  group('EventStream.loop', () {
+    test('creates self-referential stream', () {
+      scope.run(() {
+        late EventStreamSink<int> inputSink;
+        late FrappeReference<EventStream<int>> inputRef;
+
+        runTransaction(() {
+          inputSink = EventStreamSink<int>();
+          inputRef = inputSink.stream.toReference();
+        });
+
+        // Build a stream that feeds back into itself: each input event is
+        // combined with the accumulated state from the loop's own output.
+        // This mirrors how accumulate works internally but tests the loop
+        // primitive directly at the EventStream level.
+        final events = <int>[];
+        final sub = runTransaction(() {
+          final loopStream = EventStream.loop<int>((self) {
+            // Accumulate a running total: snapshot the loop's own
+            // accumulated state and add the new input event to it.
+            final accumulated = self.toState(0);
+            return inputSink.stream
+                .snapshot(accumulated, (event, total) => total + event);
+          });
+          return loopStream.listen(events.add);
+        });
+
+        // No events yet
+        expect(events, isEmpty);
+
+        inputSink.send(1);
+        expect(events, [1]); // 0 + 1
+
+        inputSink.send(2);
+        expect(events, [1, 3]); // 1 + 2
+
+        inputSink.send(3);
+        expect(events, [1, 3, 6]); // 3 + 3
+
+        sub.cancel();
+        inputRef.dispose();
+      });
+    });
+  });
 }

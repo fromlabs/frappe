@@ -33,9 +33,7 @@ void main() {
           );
 
           final refs = FrappeReferenceCollector();
-          refs.add(fill.priceState);
-          refs.add(fill.litersDeliveredState);
-          refs.add(fill.dollarsDeliveredState);
+          fill.hold(refs);
 
           expect(fill.priceState.getValue(), 0.0);
           expect(fill.litersDeliveredState.getValue(), 0.0);
@@ -53,15 +51,11 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          final clearSink = EventStreamSink<Unit>();
-          final pulsesSink = EventStreamSink<int>();
-          startSink = EventStreamSink<Fuel>();
-
           refs = FrappeReferenceCollector();
           // Keep input streams alive across transactions.
-          refs.add(clearSink.stream);
-          refs.add(pulsesSink.stream);
-          refs.add(startSink.stream);
+          final clearSink = refs.addStreamSink<Unit>();
+          final pulsesSink = refs.addStreamSink<int>();
+          startSink = refs.addStreamSink<Fuel>();
 
           fill = Fill(
             clearAccumulatorStream: clearSink.stream,
@@ -74,9 +68,7 @@ void main() {
           );
 
           // Reference all outputs to prevent GC.
-          refs.add(fill.priceState);
-          refs.add(fill.litersDeliveredState);
-          refs.add(fill.dollarsDeliveredState);
+          fill.hold(refs);
         });
 
         startSink.send(Fuel.one);
@@ -93,14 +85,10 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          final clearSink = EventStreamSink<Unit>();
-          final pulsesSink = EventStreamSink<int>();
-          startSink = EventStreamSink<Fuel>();
-
           refs = FrappeReferenceCollector();
-          refs.add(clearSink.stream);
-          refs.add(pulsesSink.stream);
-          refs.add(startSink.stream);
+          final clearSink = refs.addStreamSink<Unit>();
+          final pulsesSink = refs.addStreamSink<int>();
+          startSink = refs.addStreamSink<Fuel>();
 
           fill = Fill(
             clearAccumulatorStream: clearSink.stream,
@@ -112,9 +100,7 @@ void main() {
             startStream: startSink.stream,
           );
 
-          refs.add(fill.priceState);
-          refs.add(fill.litersDeliveredState);
-          refs.add(fill.dollarsDeliveredState);
+          fill.hold(refs);
         });
 
         startSink.send(Fuel.two);
@@ -132,14 +118,10 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          final clearSink = EventStreamSink<Unit>();
-          pulsesSink = EventStreamSink<int>();
-          startSink = EventStreamSink<Fuel>();
-
           refs = FrappeReferenceCollector();
-          refs.add(clearSink.stream);
-          refs.add(pulsesSink.stream);
-          refs.add(startSink.stream);
+          final clearSink = refs.addStreamSink<Unit>();
+          pulsesSink = refs.addStreamSink<int>();
+          startSink = refs.addStreamSink<Fuel>();
 
           fill = Fill(
             clearAccumulatorStream: clearSink.stream,
@@ -151,9 +133,7 @@ void main() {
             startStream: startSink.stream,
           );
 
-          refs.add(fill.priceState);
-          refs.add(fill.litersDeliveredState);
-          refs.add(fill.dollarsDeliveredState);
+          fill.hold(refs);
         });
 
         startSink.send(Fuel.three);
@@ -177,14 +157,10 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          clearSink = EventStreamSink<Unit>();
-          pulsesSink = EventStreamSink<int>();
-          startSink = EventStreamSink<Fuel>();
-
           refs = FrappeReferenceCollector();
-          refs.add(clearSink.stream);
-          refs.add(pulsesSink.stream);
-          refs.add(startSink.stream);
+          clearSink = refs.addStreamSink<Unit>();
+          pulsesSink = refs.addStreamSink<int>();
+          startSink = refs.addStreamSink<Fuel>();
 
           fill = Fill(
             clearAccumulatorStream: clearSink.stream,
@@ -196,9 +172,7 @@ void main() {
             startStream: startSink.stream,
           );
 
-          refs.add(fill.priceState);
-          refs.add(fill.litersDeliveredState);
-          refs.add(fill.dollarsDeliveredState);
+          fill.hold(refs);
         });
 
         startSink.send(Fuel.one);

@@ -40,8 +40,7 @@ void main() {
         final refs = FrappeReferenceCollector();
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-          refs.add(keypadSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
 
           keypad = Keypad(
             keypadStream: keypadSink.stream,
@@ -49,7 +48,7 @@ void main() {
             activeState: ValueState.constant(true),
           );
 
-          refs.add(keypad.valueState);
+          keypad.hold(refs);
         });
 
         keypadSink.send(NumericKey.one);
@@ -72,8 +71,7 @@ void main() {
         final refs = FrappeReferenceCollector();
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-          refs.add(keypadSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
 
           keypad = Keypad(
             keypadStream: keypadSink.stream,
@@ -81,7 +79,7 @@ void main() {
             activeState: ValueState.constant(true),
           );
 
-          refs.add(keypad.valueState);
+          keypad.hold(refs);
         });
 
         keypadSink.send(NumericKey.five);
@@ -101,8 +99,7 @@ void main() {
         final refs = FrappeReferenceCollector();
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-          refs.add(keypadSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
 
           keypad = Keypad(
             keypadStream: keypadSink.stream,
@@ -110,7 +107,7 @@ void main() {
             activeState: ValueState.constant(true),
           );
 
-          refs.add(keypad.valueState);
+          keypad.hold(refs);
         });
 
         // Type 999.
@@ -134,8 +131,7 @@ void main() {
         final refs = FrappeReferenceCollector();
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-          refs.add(keypadSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
 
           keypad = Keypad(
             keypadStream: keypadSink.stream,
@@ -143,7 +139,7 @@ void main() {
             activeState: ValueState.constant(false),
           );
 
-          refs.add(keypad.valueState);
+          keypad.hold(refs);
         });
 
         keypadSink.send(NumericKey.five);
@@ -161,10 +157,8 @@ void main() {
         final refs = FrappeReferenceCollector();
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-          clearSink = EventStreamSink<Unit>();
-          refs.add(keypadSink.stream);
-          refs.add(clearSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
+          clearSink = refs.addStreamSink<Unit>();
 
           keypad = Keypad(
             keypadStream: keypadSink.stream,
@@ -172,7 +166,7 @@ void main() {
             activeState: ValueState.constant(true),
           );
 
-          refs.add(keypad.valueState);
+          keypad.hold(refs);
         });
 
         keypadSink.send(NumericKey.seven);
@@ -192,8 +186,7 @@ void main() {
         final refs = FrappeReferenceCollector();
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-          refs.add(keypadSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
 
           keypad = Keypad(
             keypadStream: keypadSink.stream,
@@ -201,8 +194,7 @@ void main() {
             activeState: ValueState.constant(true),
           );
 
-          refs.add(keypad.valueState);
-          refs.add(keypad.beepStream);
+          keypad.hold(refs);
         });
 
         final beeps = <Unit>[];
@@ -226,8 +218,7 @@ void main() {
         final refs = FrappeReferenceCollector();
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-          refs.add(keypadSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
 
           keypad = Keypad(
             keypadStream: keypadSink.stream,
@@ -235,7 +226,7 @@ void main() {
             activeState: ValueState.constant(true),
           );
 
-          refs.add(keypad.valueState);
+          keypad.hold(refs);
         });
 
         keypadSink.send(NumericKey.one);

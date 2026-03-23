@@ -3,6 +3,7 @@ import 'event_stream.dart';
 import 'frappe_scope.dart';
 import 'node.dart';
 import 'reference.dart';
+import 'typedefs.dart';
 import 'value_state.dart';
 
 /// Provides [toReference] on [EventStream] for creating a [FrappeReference]
@@ -38,6 +39,46 @@ class FrappeReferenceCollector implements Disposable {
     }
     _references.add(ref);
     return frappeObject;
+  }
+
+  /// Creates an [EventStreamSink] and references its stream.
+  ///
+  /// Must be called within a transaction. The stream stays alive until
+  /// this collector is disposed.
+  EventStreamSink<E> addStreamSink<E>([Merger<E>? sinkMerger]) {
+    final sink = EventStreamSink<E>(sinkMerger);
+    add(sink.stream);
+    return sink;
+  }
+
+  /// Creates a [ValueStateSink] and references its state.
+  ///
+  /// Must be called within a transaction. The state stays alive until
+  /// this collector is disposed.
+  ValueStateSink<V> addStateSink<V>(V initValue, [Merger<V>? merger]) {
+    final sink = ValueStateSink<V>(initValue, merger);
+    add(sink.state);
+    return sink;
+  }
+
+  /// Creates an [EventStreamLink] and references its stream.
+  ///
+  /// Must be called within a transaction. The stream stays alive until
+  /// this collector is disposed.
+  EventStreamLink<E> addStreamLink<E>() {
+    final link = EventStreamLink<E>();
+    add(link.stream);
+    return link;
+  }
+
+  /// Creates a [ValueStateLink] and references its state.
+  ///
+  /// Must be called within a transaction. The state stays alive until
+  /// this collector is disposed.
+  ValueStateLink<V> addStateLink<V>() {
+    final link = ValueStateLink<V>();
+    add(link.state);
+    return link;
   }
 
   /// Disposes all collected [FrappeReference]s and clears the list.

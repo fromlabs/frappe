@@ -251,6 +251,92 @@ void main() {
     });
   });
 
+  group('FrappeReferenceCollector factory methods', () {
+    test('addStreamSink creates sink and references stream', () {
+      scope.run(() {
+        final collector = FrappeReferenceCollector();
+        late EventStreamSink<int> sink;
+
+        runTransaction(() {
+          sink = collector.addStreamSink<int>();
+        });
+
+        expect(sink.isClosed, isFalse);
+
+        final events = <int>[];
+        final sub = runTransaction(() => sink.stream.listen(events.add));
+        sink.send(42);
+        expect(events, [42]);
+
+        sub.cancel();
+        collector.dispose();
+        expect(sink.isClosed, isTrue);
+      });
+    });
+
+    test('addStateSink creates sink and references state', () {
+      scope.run(() {
+        final collector = FrappeReferenceCollector();
+        late ValueStateSink<int> sink;
+
+        runTransaction(() {
+          sink = collector.addStateSink<int>(0);
+        });
+
+        expect(sink.isClosed, isFalse);
+        expect(sink.state.getValue(), 0);
+
+        sink.send(99);
+        expect(sink.state.getValue(), 99);
+
+        collector.dispose();
+        expect(sink.isClosed, isTrue);
+      });
+    });
+
+    test('addStreamLink creates link and references stream', () {
+      scope.run(() {
+        final collector = FrappeReferenceCollector();
+        late EventStreamLink<int> link;
+        late EventStreamSink<int> sourceSink;
+
+        runTransaction(() {
+          link = collector.addStreamLink<int>();
+          sourceSink = EventStreamSink<int>();
+          collector.add(sourceSink.stream);
+          link.connect(sourceSink.stream);
+        });
+
+        expect(link.isConnected, isTrue);
+
+        final events = <int>[];
+        final sub = runTransaction(() => link.stream.listen(events.add));
+        sourceSink.send(7);
+        expect(events, [7]);
+
+        sub.cancel();
+        collector.dispose();
+      });
+    });
+
+    test('addStateLink creates link and references state', () {
+      scope.run(() {
+        final collector = FrappeReferenceCollector();
+        late ValueStateLink<int> link;
+
+        runTransaction(() {
+          link = collector.addStateLink<int>();
+          link.connect(ValueState.constant(42));
+        });
+
+        expect(link.isConnected, isTrue);
+        expect(link.state.getValue(), 42);
+
+        collector.dispose();
+      });
+    });
+  });
+
   group('Reference additional coverage', () {
     test('FrappeReference double dispose is safe', () {
       scope.run(() {

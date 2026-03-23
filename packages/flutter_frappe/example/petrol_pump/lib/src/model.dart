@@ -69,6 +69,23 @@ class Inputs {
     required this.clearSaleStream,
   });
 
+  /// References all reactive fields via [collector], keeping them alive
+  /// until the collector is disposed. Returns `this` for chaining.
+  Inputs hold(FrappeReferenceCollector collector) {
+    collector
+      ..add(nozzle1Stream)
+      ..add(nozzle2Stream)
+      ..add(nozzle3Stream)
+      ..add(keypadStream)
+      ..add(fuelPulsesStream)
+      ..add(calibrationState)
+      ..add(price1State)
+      ..add(price2State)
+      ..add(price3State)
+      ..add(clearSaleStream);
+    return this;
+  }
+
   /// Creates inputs with default (inert) streams and states.
   ///
   /// Any parameter left null is replaced with a never-firing stream or a
@@ -141,6 +158,59 @@ class Outputs {
     required this.beepStream,
     required this.saleCompleteStream,
   });
+
+  /// References all reactive fields via [collector], keeping them alive
+  /// until the collector is disposed. Returns `this` for chaining.
+  Outputs hold(FrappeReferenceCollector collector) {
+    collector
+      ..add(deliveryState)
+      ..add(presetLcdState)
+      ..add(saleCostLcdState)
+      ..add(saleQuantityLcdState)
+      ..add(priceLcd1State)
+      ..add(priceLcd2State)
+      ..add(priceLcd3State)
+      ..add(beepStream)
+      ..add(saleCompleteStream);
+    return this;
+  }
+
+  /// Flattens a state-of-[Outputs] into a single [Outputs] by switch-mapping
+  /// each field individually.
+  ///
+  /// [ValueState] fields use [switchMapState] + [distinct] so the output
+  /// only updates when the inner value actually changes.
+  /// [EventStream] fields use [switchMapStream] to forward events from
+  /// whichever inner [Outputs] is currently active.
+  factory Outputs.switchFrom(ValueState<Outputs> outputsState) {
+    return Outputs(
+      deliveryState: outputsState
+          .switchMapState((o) => o.deliveryState)
+          .distinct(),
+      presetLcdState: outputsState
+          .switchMapState((o) => o.presetLcdState)
+          .distinct(),
+      saleCostLcdState: outputsState
+          .switchMapState((o) => o.saleCostLcdState)
+          .distinct(),
+      saleQuantityLcdState: outputsState
+          .switchMapState((o) => o.saleQuantityLcdState)
+          .distinct(),
+      priceLcd1State: outputsState
+          .switchMapState((o) => o.priceLcd1State)
+          .distinct(),
+      priceLcd2State: outputsState
+          .switchMapState((o) => o.priceLcd2State)
+          .distinct(),
+      priceLcd3State: outputsState
+          .switchMapState((o) => o.priceLcd3State)
+          .distinct(),
+      beepStream:
+          outputsState.switchMapStream((o) => o.beepStream),
+      saleCompleteStream:
+          outputsState.switchMapStream((o) => o.saleCompleteStream),
+    );
+  }
 
   /// Creates outputs with default (inert) values.
   ///

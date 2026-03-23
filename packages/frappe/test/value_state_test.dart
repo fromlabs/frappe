@@ -949,4 +949,76 @@ void main() {
       });
     });
   });
+
+  group('ValueState.loop', () {
+    test('creates self-referential state with accumulation', () {
+      scope.run(() {
+        late EventStreamSink<void> incrementSink;
+        late FrappeReference<EventStream<void>> incrementRef;
+
+        runTransaction(() {
+          incrementSink = EventStreamSink<void>();
+          incrementRef = incrementSink.stream.toReference();
+        });
+
+        // Build a counter that snapshots its own value and increments it.
+        // This is the canonical use case for loop: the state references
+        // itself via the forward-declared `self` parameter.
+        final values = <int>[];
+        final sub = runTransaction(() {
+          final counter = ValueState.loop<int>((self) =>
+              incrementSink.stream.snapshot(self, (_, n) => n + 1).toState(0));
+          return counter.listen(values.add);
+        });
+
+        expect(values, [0]); // Initial value
+
+        incrementSink.send(null);
+        expect(values, [0, 1]); // First increment
+
+        incrementSink.send(null);
+        expect(values, [0, 1, 2]); // Second increment
+
+        incrementSink.send(null);
+        expect(values, [0, 1, 2, 3]); // Third increment
+
+        sub.cancel();
+        incrementRef.dispose();
+      });
+    });
+
+    test('initial value comes from builder toState', () {
+      scope.run(() {
+        late EventStreamSink<int> sink;
+        late FrappeReference<EventStream<int>> ref;
+
+        runTransaction(() {
+          sink = EventStreamSink<int>();
+          ref = sink.stream.toReference();
+        });
+
+        // The initial value is determined by the toState argument inside
+        // the builder, not by any external source.
+        late ValueState<int> loopState;
+        final values = <int>[];
+        final sub = runTransaction(() {
+          loopState = ValueState.loop<int>((self) =>
+              sink.stream.snapshot(self, (event, current) => event).toState(42));
+          return loopState.listen(values.add);
+        });
+
+        // The initial value should be 42 as passed to toState
+        expect(values, [42]);
+        expect(loopState.getValue(), 42);
+
+        // After sending an event, the value updates
+        sink.send(100);
+        expect(values, [42, 100]);
+        expect(loopState.getValue(), 100);
+
+        sub.cancel();
+        ref.dispose();
+      });
+    });
+  });
 }

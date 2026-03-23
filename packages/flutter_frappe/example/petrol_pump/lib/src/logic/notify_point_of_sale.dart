@@ -30,22 +30,28 @@ class NotifyPointOfSale {
     required Fill fill,
     required EventStream<Unit> clearSaleStream,
   }) {
-    final phaseStateRef = ValueStateLink<_Phase>();
+    // startStream/endStream are derived inside the loop but exposed as outputs.
+    late EventStream<Fuel> startStream;
+    late EventStream<Unit> endStream;
 
-    // Only allow start when idle.
-    final startStream = lifecycle.startStream
-        .gate(phaseStateRef.state.map((phase) => phase == _Phase.idle));
+    // Phase transitions: idle -> filling -> pos -> idle.
+    // The returned ValueState is not used directly -- the loop only establishes
+    // the cycle so that startStream/endStream are gated by the phase.
+    ValueState.loop<_Phase>((self) {
+      // Only allow start when idle.
+      startStream = lifecycle.startStream
+          .gate(self.map((phase) => phase == _Phase.idle));
 
-    // Only allow end when filling.
-    final endStream = lifecycle.endStream
-        .gate(phaseStateRef.state.map((phase) => phase == _Phase.filling))
-        .mapToUnit();
+      // Only allow end when filling.
+      endStream = lifecycle.endStream
+          .gate(self.map((phase) => phase == _Phase.filling))
+          .mapToUnit();
 
-    // Phase transitions: idle → filling → pos → idle.
-    phaseStateRef.connect(startStream.mapTo(_Phase.filling).orElses([
-      endStream.mapTo(_Phase.pos),
-      clearSaleStream.mapTo(_Phase.idle),
-    ]).toState(_Phase.idle));
+      return startStream.mapTo(_Phase.filling).orElses([
+        endStream.mapTo(_Phase.pos),
+        clearSaleStream.mapTo(_Phase.idle),
+      ]).toState(_Phase.idle);
+    });
 
     // Fuel flowing: set on start, cleared on end.
     final fuelFlowingState = startStream
@@ -86,6 +92,19 @@ class NotifyPointOfSale {
       beepStream: clearSaleStream,
       saleCompleteStream: saleCompleteStream,
     );
+  }
+
+  /// References all reactive fields via [collector], keeping them alive
+  /// until the collector is disposed. Returns `this` for chaining.
+  NotifyPointOfSale hold(FrappeReferenceCollector collector) {
+    collector
+      ..add(fillActiveState)
+      ..add(fuelFlowingState)
+      ..add(startStream)
+      ..add(endStream)
+      ..add(beepStream)
+      ..add(saleCompleteStream);
+    return this;
   }
 
   NotifyPointOfSale._({

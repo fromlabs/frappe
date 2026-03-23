@@ -76,6 +76,16 @@ class Fill {
     );
   }
 
+  /// References all reactive fields via [collector], keeping them alive
+  /// until the collector is disposed. Returns `this` for chaining.
+  Fill hold(FrappeReferenceCollector collector) {
+    collector
+      ..add(priceState)
+      ..add(dollarsDeliveredState)
+      ..add(litersDeliveredState);
+    return this;
+  }
+
   Fill._({
     required this.priceState,
     required this.dollarsDeliveredState,

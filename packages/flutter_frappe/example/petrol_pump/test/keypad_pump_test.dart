@@ -21,8 +21,7 @@ void main() {
           final pump = KeypadPump();
           final outputs = pump.create(Inputs.defaults());
           final refs = FrappeReferenceCollector();
-          refs.add(outputs.presetLcdState);
-          refs.add(outputs.beepStream);
+          outputs.hold(refs);
 
           expect(outputs.presetLcdState.getValue(), '0');
 
@@ -38,18 +37,15 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-
           refs = FrappeReferenceCollector();
-          refs.add(keypadSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
 
           final pump = KeypadPump();
           outputs = pump.create(Inputs.defaults(
             keypadStream: keypadSink.stream,
           ));
 
-          refs.add(outputs.presetLcdState);
-          refs.add(outputs.beepStream);
+          outputs.hold(refs);
         });
 
         keypadSink.send(NumericKey.five);
@@ -69,18 +65,15 @@ void main() {
         late FrappeReferenceCollector refs;
 
         runTransaction(() {
-          keypadSink = EventStreamSink<NumericKey>();
-
           refs = FrappeReferenceCollector();
-          refs.add(keypadSink.stream);
+          keypadSink = refs.addStreamSink<NumericKey>();
 
           final pump = KeypadPump();
           outputs = pump.create(Inputs.defaults(
             keypadStream: keypadSink.stream,
           ));
 
-          refs.add(outputs.presetLcdState);
-          refs.add(outputs.beepStream);
+          outputs.hold(refs);
         });
 
         final beeps = <Unit>[];
