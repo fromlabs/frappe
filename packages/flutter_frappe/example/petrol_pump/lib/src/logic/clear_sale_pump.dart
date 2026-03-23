@@ -14,8 +14,10 @@ class ClearSalePump extends BasePump {
   Outputs create(Inputs inputs) {
     // Break the circular dependency: Fill needs startStream, but it comes
     // from NotifyPointOfSale which depends on Fill.
+    // Break the circular dependency: Fill needs startStream, but it comes
+    // from NotifyPointOfSale which depends on Fill.
     final (_, (fill, notifyPointOfSale)) =
-        EventStream.loopWith((EventStream<Fuel> startSelf) {
+        EventStream.loopWith((EventStream<Fuel> self) {
       final fill = Fill(
         clearAccumulatorStream: inputs.clearSaleStream,
         fuelsPulsesStream: inputs.fuelPulsesStream,
@@ -23,7 +25,7 @@ class ClearSalePump extends BasePump {
         price1State: inputs.price1State,
         price2State: inputs.price2State,
         price3State: inputs.price3State,
-        startStream: startSelf,
+        startStream: self,
       );
 
       final notifyPointOfSale = NotifyPointOfSale(

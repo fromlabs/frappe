@@ -98,38 +98,48 @@ class EventStream<E> {
   EventStream.never()
       : _node = KeyNode<E>(evaluationType: EvaluationType.never);
 
-  /// Creates a self-referential stream for cyclic dependencies.
+  /// Creates a self-referential stream for simple cyclic dependencies.
   ///
-  /// The [builder] receives a forward-declared stream (`self`) that can be
-  /// used in expressions before its definition is known. The builder must
-  /// return the actual [EventStream] that `self` will resolve to.
+  /// The [builder] receives `self` (the forward-declared stream) and `connect`
+  /// (a function to close the cycle). Requires an explicit type argument.
   ///
   /// ```dart
-  /// final filtered = EventStream.loop<Fuel>((self) {
-  ///   final result = process(self);
-  ///   return result.outputStream;
+  /// final loopStream = EventStream.loop<int>((self, connect) {
+  ///   final accumulated = self.toState(0);
+  ///   connect(inputStream.snapshot(accumulated, (e, t) => t + e));
   /// });
   /// ```
+  ///
+  /// For extracting intermediate signals, use [loopWith] instead.
+  /// For advanced cases (inter-object cycles), use [EventStreamLink] directly.
   static EventStream<E> loop<E>(
-          EventStream<E> Function(EventStream<E> self) builder) =>
+          void Function(
+                  EventStream<E> self, void Function(EventStream<E>) connect)
+              builder) =>
       Transaction.runRequired((_) {
         final link = EventStreamLink<E>();
-        link.connect(builder(link.stream));
+        builder(link.stream, link.connect);
+        assert(link.isConnected,
+            'EventStream.loop builder must call connect() before returning');
         return link.stream;
       });
 
-  /// Like [loop], but the builder returns a record `(EventStream<E>, R)`.
+  /// Creates a self-referential stream with multi-output extraction.
   ///
-  /// The first element closes the cycle (connected to `self`);
-  /// the second element is returned alongside the looped stream,
-  /// allowing extraction of intermediate signals without `late` variables.
+  /// The [builder] receives the forward-declared stream (`self`) and returns
+  /// a record `(EventStream<E>, R)`. The first element closes the cycle
+  /// (auto-connected to `self`); the second is returned alongside.
   ///
   /// ```dart
-  /// final (filtered, count) = EventStream.loopWith((EventStream<int> self) {
-  ///   final output = self.where((e) => e > 0);
-  ///   return (inputStream.merge(output), output.accumulate(0, (_, n) => n + 1));
+  /// final (_, (fill, nps)) =
+  ///     EventStream.loopWith((EventStream<Fuel> self) {
+  ///   final fill = Fill(startStream: self, ...);
+  ///   final nps = NotifyPointOfSale(fill: fill, ...);
+  ///   return (nps.startStream, (fill, nps));
   /// });
   /// ```
+  ///
+  /// For simple single-output cycles, use [loop] instead.
   static (EventStream<E>, R) loopWith<E, R>(
           (EventStream<E>, R) Function(EventStream<E> self) builder) =>
       Transaction.runRequired((_) {
@@ -281,14 +291,16 @@ class EventStream<E> {
 
   /// Accumulates a state over events.
   ValueState<V> accumulate<V>(V initValue, Accumulator<E, V> accumulator) =>
-      ValueState.loop<V>(
-          (self) => snapshot(self, accumulator).toState(initValue));
+      ValueState.loop<V>((self, connect) {
+        connect(snapshot(self, accumulator).toState(initValue));
+      });
 
   /// Accumulates a state with lazy initial value.
   ValueState<V> accumulateLazy<V>(
           LazyValue<V> lazyInitValue, Accumulator<E, V> accumulator) =>
-      ValueState.loop<V>(
-          (self) => snapshot(self, accumulator).toStateLazy(lazyInitValue));
+      ValueState.loop<V>((self, connect) {
+        connect(snapshot(self, accumulator).toStateLazy(lazyInitValue));
+      });
 
   /// Collects events with stateful transformation.
   EventStream<ER> collect<ER, V>(V initValue, Collector<E, V, ER> collector) =>

@@ -1321,7 +1321,7 @@ void main() {
   });
 
   group('EventStream.loop', () {
-    test('creates self-referential stream', () {
+    test('simple self-referential accumulation', () {
       scope.run(() {
         late EventStreamSink<int> inputSink;
         late FrappeReference<EventStream<int>> inputRef;
@@ -1331,33 +1331,24 @@ void main() {
           inputRef = inputSink.stream.toReference();
         });
 
-        // Build a stream that feeds back into itself: each input event is
-        // combined with the accumulated state from the loop's own output.
-        // This mirrors how accumulate works internally but tests the loop
-        // primitive directly at the EventStream level.
+        // loop<E> gives (self, connect) — explicit <int> on the call.
         final events = <int>[];
         final sub = runTransaction(() {
-          final loopStream = EventStream.loop<int>((self) {
-            // Accumulate a running total: snapshot the loop's own
-            // accumulated state and add the new input event to it.
+          final loopStream = EventStream.loop<int>((self, connect) {
             final accumulated = self.toState(0);
-            return inputSink.stream
-                .snapshot(accumulated, (event, total) => total + event);
+            connect(inputSink.stream
+                .snapshot(accumulated, (event, total) => total + event));
           });
           return loopStream.listen(events.add);
         });
 
-        // No events yet
         expect(events, isEmpty);
-
         inputSink.send(1);
-        expect(events, [1]); // 0 + 1
-
+        expect(events, [1]);
         inputSink.send(2);
-        expect(events, [1, 3]); // 1 + 2
-
+        expect(events, [1, 3]);
         inputSink.send(3);
-        expect(events, [1, 3, 6]); // 3 + 3
+        expect(events, [1, 3, 6]);
 
         sub.cancel();
         inputRef.dispose();
@@ -1366,7 +1357,7 @@ void main() {
   });
 
   group('EventStream.loopWith', () {
-    test('returns looped stream and extra output', () {
+    test('extracts intermediate signal alongside looped stream', () {
       scope.run(() {
         late EventStreamSink<int> inputSink;
         late FrappeReference<EventStream<int>> inputRef;
@@ -1376,8 +1367,8 @@ void main() {
           inputRef = inputSink.stream.toReference();
         });
 
-        // loopWith returns the looped stream plus an extra signal
-        // built inside the builder — no late vars needed.
+        // loopWith auto-connects the first record element; the second
+        // is the extra output.
         final events = <int>[];
         final totals = <int>[];
         late ListenSubscription sub;
@@ -1396,12 +1387,10 @@ void main() {
         });
 
         expect(events, isEmpty);
-        expect(totals, [0]); // Initial value of accumulated state
-
+        expect(totals, [0]);
         inputSink.send(1);
         expect(events, [1]);
-        expect(totals, [0, 1]); // Updated after the event
-
+        expect(totals, [0, 1]);
         inputSink.send(2);
         expect(events, [1, 3]);
         expect(totals, [0, 1, 3]);

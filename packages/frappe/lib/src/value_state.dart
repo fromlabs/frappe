@@ -96,36 +96,46 @@ class ValueState<V> {
   ValueState.constant(V initValue)
       : this._(LazyValue.value(initValue), EventStream<V>.never());
 
-  /// Creates a self-referential state for cyclic dependencies.
+  /// Creates a self-referential state for simple cyclic dependencies.
   ///
-  /// The [builder] receives a forward-declared state (`self`) that can be
-  /// used in expressions before its definition is known. The builder must
-  /// return the actual [ValueState] that `self` will resolve to.
+  /// The [builder] receives `self` (the forward-declared state) and `connect`
+  /// (a function to close the cycle). Requires an explicit type argument.
   ///
   /// ```dart
-  /// final counter = ValueState.loop<int>((self) =>
-  ///     incrementStream.snapshot(self, (_, n) => n + 1).toState(0));
+  /// final counter = ValueState.loop<int>((self, connect) {
+  ///   connect(incrementStream.snapshot(self, (_, n) => n + 1).toState(0));
+  /// });
   /// ```
+  ///
+  /// For extracting intermediate signals, use [loopWith] instead.
+  /// For advanced cases (inter-object cycles), use [ValueStateLink] directly.
   static ValueState<V> loop<V>(
-          ValueState<V> Function(ValueState<V> self) builder) =>
+          void Function(ValueState<V> self, void Function(ValueState<V>) connect)
+              builder) =>
       Transaction.runRequired((_) {
         final link = ValueStateLink<V>();
-        link.connect(builder(link.state));
+        builder(link.state, link.connect);
+        assert(link.isConnected,
+            'ValueState.loop builder must call connect() before returning');
         return link.state;
       });
 
-  /// Like [loop], but the builder returns a record `(ValueState<V>, R)`.
+  /// Creates a self-referential state with multi-output extraction.
   ///
-  /// The first element closes the cycle (connected to `self`);
-  /// the second element is returned alongside the looped state,
-  /// allowing extraction of intermediate signals without `late` variables.
+  /// The [builder] receives the forward-declared state (`self`) and returns
+  /// a record `(ValueState<V>, R)`. The first element closes the cycle
+  /// (auto-connected to `self`); the second is returned alongside.
   ///
   /// ```dart
-  /// final (counter, resetStream) = ValueState.loopWith((ValueState<int> self) {
-  ///   final reset = someStream.snapshot(self, (_, n) => n > 10);
-  ///   return (incrementStream.snapshot(self, (_, n) => n + 1).toState(0), reset);
+  /// final (fillActive, (start, end)) =
+  ///     ValueState.loopWith((ValueState<Fuel?> self) {
+  ///   final start = startEvents.snapshot(self, ...);
+  ///   final end = endEvents.snapshot(self, ...);
+  ///   return (end.mapTo(null).orElse(start).toState(null), (start, end));
   /// });
   /// ```
+  ///
+  /// For simple single-output cycles, use [loop] instead.
   static (ValueState<V>, R) loopWith<V, R>(
           (ValueState<V>, R) Function(ValueState<V> self) builder) =>
       Transaction.runRequired((_) {

@@ -16,8 +16,10 @@ class PresetAmountPump extends BasePump {
   Outputs create(Inputs inputs) {
     // Break the circular dependency: Fill needs startStream, but it comes
     // from NotifyPointOfSale which depends on Fill.
+    // Break the circular dependency: Fill needs startStream, but it comes
+    // from NotifyPointOfSale which depends on Fill.
     final (_, (fill, notifyPointOfSale)) =
-        EventStream.loopWith((EventStream<Fuel> startSelf) {
+        EventStream.loopWith((EventStream<Fuel> self) {
       final fill = Fill(
         clearAccumulatorStream: inputs.clearSaleStream,
         fuelsPulsesStream: inputs.fuelPulsesStream,
@@ -25,7 +27,7 @@ class PresetAmountPump extends BasePump {
         price1State: inputs.price1State,
         price2State: inputs.price2State,
         price3State: inputs.price3State,
-        startStream: startSelf,
+        startStream: self,
       );
 
       final notifyPointOfSale = NotifyPointOfSale(
@@ -44,11 +46,11 @@ class PresetAmountPump extends BasePump {
     // Break the circular dependency: Keypad needs isKeypadActive, but it
     // comes from Preset which depends on Keypad.
     final (_, (keypad, preset)) =
-        ValueState.loopWith((ValueState<bool> activeSelf) {
+        ValueState.loopWith((ValueState<bool> self) {
       final keypad = Keypad(
         keypadStream: inputs.keypadStream,
         clearStream: inputs.clearSaleStream,
-        activeState: activeSelf,
+        activeState: self,
       );
 
       final preset = Preset(

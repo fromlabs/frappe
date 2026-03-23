@@ -16,7 +16,6 @@ class Keypad {
     required ValueState<bool> activeState,
   }) {
     // Keypad value resets on clearStream, updates on key press.
-    // loopWith extracts beepStream built inside the cycle.
     final (valueState, beepStream) =
         ValueState.loopWith((ValueState<int> self) {
       // Gate blocks key events when the keypad is inactive (e.g., during slow delivery).

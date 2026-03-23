@@ -120,12 +120,13 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
       // Each nozzle snapshots its own current value to flip it on toggle.
       _nozzleStates = List.generate(3, (i) {
         final number = i + 1;
-        return _references.add(ValueState.loop<UpDown>((self) =>
-            _toggleNozzleStreamSink.stream
-                .where((nozzle) => nozzle == number)
-                .snapshot(self,
-                    (_, nozzle) => nozzle == UpDown.up ? UpDown.down : UpDown.up)
-                .toState(UpDown.down)));
+        return _references.add(ValueState.loop<UpDown>((self, connect) {
+          connect(_toggleNozzleStreamSink.stream
+              .where((nozzle) => nozzle == number)
+              .snapshot(self,
+                  (_, nozzle) => nozzle == UpDown.up ? UpDown.down : UpDown.up)
+              .toState(UpDown.down));
+        }));
       });
 
       final calibrationStateSink = _references.addStateSink<double>(0.001);

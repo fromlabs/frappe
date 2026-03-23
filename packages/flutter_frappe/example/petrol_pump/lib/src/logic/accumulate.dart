@@ -14,10 +14,15 @@ ValueState<double> accumulate(
   // loop breaks the cyclic dependency: the running total references itself
   // (previous value + delta). On clear, reset to 0; on delta, add to
   // the current total. orElse gives clear priority within the same transaction.
-  final totalState = ValueState.loop<double>((self) => clearAccumulatorStream
-      .mapTo(0.0)
-      .orElse(deltaStream.snapshot(self, (delta, total) => total + delta))
-      .toState(0.0));
+  // loop breaks the cyclic dependency: the running total references itself
+  // (previous value + delta). On clear, reset to 0; on delta, add to
+  // the current total. orElse gives clear priority within the same transaction.
+  final totalState = ValueState.loop<double>((self, connect) {
+    connect(clearAccumulatorStream
+        .mapTo(0.0)
+        .orElse(deltaStream.snapshot(self, (delta, total) => total + delta))
+        .toState(0.0));
+  });
 
   // Apply calibration factor to convert raw pulse count to liters.
   return totalState.combine(

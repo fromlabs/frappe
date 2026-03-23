@@ -31,7 +31,7 @@ class NotifyPointOfSale {
     required EventStream<Unit> clearSaleStream,
   }) {
     // Phase transitions: idle -> filling -> pos -> idle.
-    // loopWith extracts startStream/endStream gated by the phase cycle.
+    // The looped state (_Phase) is discarded — only start/end are needed.
     final (_, (startStream, endStream)) =
         ValueState.loopWith((ValueState<_Phase> self) {
       // Only allow start when idle.

@@ -39,7 +39,6 @@ class Lifecycle {
     required EventStream<UpDown> nozzle3Stream,
   }) {
     // Fill active tracks which nozzle is up; cleared on end, set on start.
-    // loopWith extracts startStream/endStream built inside the cycle.
     final (fillActiveState, (startStream, endStream)) =
         ValueState.loopWith((ValueState<Fuel?> self) {
       // A nozzle can only start filling if no other nozzle is already active.
