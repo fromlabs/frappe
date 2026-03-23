@@ -8,6 +8,7 @@ import '../petrol_pump.dart';
 
 /// Chapter 3: Shows dollars and liters delivered, plus per-nozzle prices.
 class ShowDollarsPump extends BasePump {
+  /// Produces delivery mode, liters/dollars LCDs, and per-nozzle price LCDs.
   @override
   Outputs create(Inputs inputs) {
     final lifecycle = Lifecycle(

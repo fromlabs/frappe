@@ -4,6 +4,7 @@ import '../petrol_pump.dart';
 
 /// Chapter 1: Basic lifecycle — shows which nozzle is active.
 class LifecyclePump extends BasePump {
+  /// Produces delivery mode and a sale-cost LCD showing the active nozzle number.
   @override
   Outputs create(Inputs inputs) {
     final lifecycle = Lifecycle(

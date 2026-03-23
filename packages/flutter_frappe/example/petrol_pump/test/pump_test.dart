@@ -2,6 +2,8 @@ import 'package:petrol_pump/petrol_pump.dart';
 import 'package:frappe/frappe.dart';
 import 'package:test/test.dart';
 
+/// Flattens a state-of-outputs into a single [Outputs] by switch-mapping
+/// each output field individually and deduplicating with [distinct].
 Outputs _switchOutputs(ValueState<Outputs> outputsState) => Outputs(
       deliveryState: outputsState
           .switchMapState<Delivery>((o) => o.deliveryState)
@@ -147,34 +149,48 @@ void main() {
     });
 
     test('No action', () {
-      // Verify pump initializes without error.
+      // Pump initializes with delivery off and all LCDs showing prices.
       expect(outputs.deliveryState.getValue(), Delivery.off);
+      expect(outputs.presetLcdState.getValue(), '0');
+      expect(outputs.saleCostLcdState.getValue(), '0.0');
+      expect(outputs.saleQuantityLcdState.getValue(), '0.0');
     });
 
     test('Pump one round', () async {
+      // Lift nozzle 1 — delivery should start.
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
 
+      // Let the pump engine generate some fuel pulses.
       await Future<void>.delayed(const Duration(seconds: 1));
 
+      // Put nozzle down — delivery should stop.
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
 
+      // Wait for POS to auto-clear the sale.
       await Future<void>.delayed(const Duration(seconds: 3));
     });
 
     test('Pump two rounds', () async {
+      // First round.
       nozzle1StreamSink.send(UpDown.up);
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
       await Future<void>.delayed(const Duration(seconds: 3));
 
+      // Reconnect listeners between rounds to verify fresh subscriptions work.
       runTransaction(() {
         listenCanceler.cancel();
         connectListeners();
       });
 
+      // Second round — same nozzle, new fill.
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
       await Future<void>.delayed(const Duration(seconds: 3));
     });
   });
@@ -306,81 +322,117 @@ void main() {
     });
 
     test('No pump', () {
+      // With no pump logic selected, outputs use defaults.
       expect(outputs.deliveryState.getValue(), Delivery.off);
     });
 
     test('LifecyclePump complete', () async {
+      // Switch to LifecyclePump and verify a full fill cycle completes.
       pumpLogicStateSink.send(LifecyclePump());
 
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
     });
 
     test('AccumulatePulsesPump complete', () async {
+      // AccumulatePulsesPump tracks fuel pulses and shows liters.
       pumpLogicStateSink.send(AccumulatePulsesPump());
 
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
     });
 
     test('ShowDollarsPump complete', () async {
+      // ShowDollarsPump adds dollar calculation and per-nozzle price display.
       pumpLogicStateSink.send(ShowDollarsPump());
 
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
     });
 
     test('Clear sale pump', () async {
+      // ClearSalePump adds point-of-sale lifecycle (fill → pos → idle).
       pumpLogicStateSink.send(ClearSalePump());
       keypadStreamSink.send(NumericKey.one);
 
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
 
+      // Wait for POS simulator to auto-clear the sale.
       await clearSaleStreamReference.object.first();
     });
 
     test('Preset pump', () async {
+      // PresetAmountPump adds keypad preset, speed control, and POS integration.
       pumpLogicStateSink.send(PresetAmountPump());
       keypadStreamSink.send(NumericKey.one);
 
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
 
+      // Wait for POS simulator to auto-clear the sale.
       await clearSaleStreamReference.object.first();
     });
 
     test('All pumps switch', () async {
+      // Switch through every pump implementation in sequence, verifying
+      // that the switchMapState mechanism correctly swaps reactive graphs.
+
+      // 1. LifecyclePump
       pumpLogicStateSink.send(LifecyclePump());
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
 
+      // 2. AccumulatePulsesPump
       pumpLogicStateSink.send(AccumulatePulsesPump());
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
 
+      // 3. ShowDollarsPump
       pumpLogicStateSink.send(ShowDollarsPump());
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
 
+      // 4. ClearSalePump
       pumpLogicStateSink.send(ClearSalePump());
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
       await clearSaleStreamReference.object.first();
 
+      // 5. PresetAmountPump
       pumpLogicStateSink.send(PresetAmountPump());
       nozzle1StreamSink.send(UpDown.up);
+      expect(outputs.deliveryState.getValue(), isNot(Delivery.off));
       await Future<void>.delayed(const Duration(seconds: 1));
       nozzle1StreamSink.send(UpDown.down);
+      expect(outputs.deliveryState.getValue(), Delivery.off);
       await clearSaleStreamReference.object.first();
     });
   });

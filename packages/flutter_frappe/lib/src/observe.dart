@@ -22,6 +22,11 @@ class Observe<V> extends StatefulWidget {
   State<Observe<V>> createState() => _ObserveState<V>();
 }
 
+/// Mutable state for [Observe].
+///
+/// Manages the subscription lifecycle: subscribes on [initState], resubscribes
+/// when the [ValueState] instance changes in [didUpdateWidget], and cancels the
+/// subscription on [dispose].
 class _ObserveState<V> extends State<Observe<V>> {
   late V _value;
   ListenSubscription? _subscription;
@@ -42,6 +47,7 @@ class _ObserveState<V> extends State<Observe<V>> {
     }
   }
 
+  /// Reads the current value and starts listening for future updates.
   void _subscribe() {
     _value = widget.state.getValue();
     // Errors thrown inside this listener are caught by
@@ -58,6 +64,7 @@ class _ObserveState<V> extends State<Observe<V>> {
     });
   }
 
+  /// Cancels the active subscription and clears the reference.
   void _unsubscribe() {
     _subscription?.cancel();
     _subscription = null;

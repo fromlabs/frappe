@@ -4,7 +4,10 @@ import '../model.dart';
 
 /// Manages numeric keypad input, producing an integer preset value.
 class Keypad {
+  /// The current accumulated integer value entered on the keypad.
   final ValueState<int> valueState;
+
+  /// Fires whenever a valid key press is accepted (used to trigger a beep).
   final EventStream<Unit> beepStream;
 
   factory Keypad({
@@ -14,14 +17,18 @@ class Keypad {
   }) {
     final valueStateRef = ValueStateLink<int>();
 
+    // Gate blocks key events when the keypad is inactive (e.g., during slow delivery).
     final validKeyStream = keypadStream.gate(activeState);
 
+    // Shift the current value left by one decimal place and append the new digit.
+    // Returns null (filtered out below) if the result would exceed 1000.
     final updateValueStream = validKeyStream
         .snapshot<int, int?>(valueStateRef.state, (key, value) {
           if (key == NumericKey.clear) {
             return 0;
           }
           final value10 = value * 10;
+          // Cap at 1000 to prevent unreasonably large preset amounts.
           if (value10 > 1000) return null;
           // Map key to its numeric digit and add to accumulated value.
           return switch (key) {
@@ -40,6 +47,7 @@ class Keypad {
         })
         .mapWhereNotNull();
 
+    // Close the cycle: keypad value resets on clearStream, updates on key press.
     valueStateRef
         .connect(updateValueStream.orElse(clearStream.mapTo(0)).toState(0));
 

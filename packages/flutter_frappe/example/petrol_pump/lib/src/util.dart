@@ -37,10 +37,13 @@ extension FrappeReferenceIterable<FR extends FrappeReference> on Iterable<FR> {
 
 /// A periodic timer that emits [Unit] events at a fixed interval.
 class PeriodicTimer {
+  /// The interval between ticks.
   final Duration period;
+
   final EventStreamSink<Unit> _timerStreamSink = EventStreamSink();
   StreamSubscription<dynamic>? _timerSubscription;
 
+  /// Creates a periodic timer that starts ticking immediately at [period].
   PeriodicTimer(this.period) {
     _timerSubscription =
         Stream.periodic(period).listen((_) => _timerStreamSink.send(unit));

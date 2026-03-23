@@ -6,6 +6,7 @@ import '../petrol_pump.dart';
 
 /// Chapter 4a: Keypad-only demo — shows preset value and beeps.
 class KeypadPump extends BasePump {
+  /// Produces the preset LCD display value and a beep stream on valid key presses.
   @override
   Outputs create(Inputs inputs) {
     final keypad = Keypad(

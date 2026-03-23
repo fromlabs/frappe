@@ -7,11 +7,22 @@ import '../model.dart';
 /// Manages the point-of-sale notification lifecycle:
 /// tracks fill state, fuel flowing, and emits sale-complete events.
 class NotifyPointOfSale {
+  /// Which fuel is shown on the display; persists until the sale is cleared.
   final ValueState<Fuel?> fillActiveState;
+
+  /// Which fuel is physically flowing; cleared immediately when the nozzle is set down.
   final ValueState<Fuel?> fuelFlowingState;
+
+  /// Fires with the [Fuel] type when a fill is allowed to begin.
   final EventStream<Fuel> startStream;
+
+  /// Fires when the active fill ends (nozzle set down while filling).
   final EventStream<Unit> endStream;
+
+  /// Fires when the sale is cleared at the point of sale (triggers a beep).
   final EventStream<Unit> beepStream;
+
+  /// Emits a [Sale] record when a fill completes, capturing the final totals.
   final EventStream<Sale> saleCompleteStream;
 
   factory NotifyPointOfSale({
@@ -87,4 +98,13 @@ class NotifyPointOfSale {
   });
 }
 
-enum _Phase { idle, filling, pos }
+enum _Phase {
+  /// No active fill; the pump is ready for a new customer.
+  idle,
+
+  /// Fuel is being dispensed; the nozzle is lifted.
+  filling,
+
+  /// Fill complete; waiting for the point-of-sale to clear the transaction.
+  pos,
+}

@@ -7,6 +7,7 @@ import '../petrol_pump.dart';
 
 /// Chapter 2: Accumulates fuel pulses and shows liters delivered.
 class AccumulatePulsesPump extends BasePump {
+  /// Produces delivery mode and a quantity LCD showing accumulated liters.
   @override
   Outputs create(Inputs inputs) {
     final lifecycle = Lifecycle(

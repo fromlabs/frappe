@@ -11,6 +11,7 @@ import '../petrol_pump.dart';
 
 /// Chapter 4c: Full pump with preset amount, keypad, and speed control.
 class PresetAmountPump extends BasePump {
+  /// Produces all display outputs with preset-controlled speed, keypad, beep, and sale events.
   @override
   Outputs create(Inputs inputs) {
     final startStreamRef = EventStreamLink<Fuel>();

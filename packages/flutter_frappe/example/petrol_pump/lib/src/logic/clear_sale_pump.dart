@@ -9,6 +9,7 @@ import '../petrol_pump.dart';
 
 /// Chapter 4b: Full lifecycle with point-of-sale notification and clear-sale.
 class ClearSalePump extends BasePump {
+  /// Produces all display outputs plus sale-complete events and beep on clear.
   @override
   Outputs create(Inputs inputs) {
     final startStreamRef = EventStreamLink<Fuel>();

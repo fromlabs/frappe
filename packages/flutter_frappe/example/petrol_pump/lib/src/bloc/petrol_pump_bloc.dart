@@ -4,31 +4,74 @@ import '../simulator/pump_engine_simulator_impl.dart';
 import '../model.dart';
 import '../petrol_pump.dart';
 
+/// Converts an LCD display string to a nullable double.
+///
+/// Returns `null` for empty strings (no value displayed), otherwise
+/// parses the numeric text.
 double? _fromLcdMapper(String lcd) =>
     lcd.isNotEmpty ? double.parse(lcd) : null;
 
 /// The petrol pump business logic coordinator.
+///
+/// Exposes reactive outputs for the UI and imperative methods for user
+/// actions. The active pump logic can be swapped at runtime via
+/// [setPumpLogic].
 abstract class PetrolPumpBloc {
+  /// The currently selected pump logic algorithm, or `null` if none.
   ValueState<Pump?> get pumpLogicState;
+
+  /// Editable price settings for each fuel type (indexed 0-2).
   List<ValueState<double>> get priceSettingStates;
+
+  /// Current up/down position of each nozzle (indexed 0-2).
   List<ValueState<UpDown>> get nozzleStates;
+
+  /// Per-unit price displayed for each fuel type, or `null` when blank.
   List<ValueState<double?>> get priceStates;
+
+  /// Preset dollar amount entered via the keypad, or `null` when blank.
   ValueState<double?> get presetState;
+
+  /// Running cost of the current sale, or `null` when no sale is active.
   ValueState<double?> get saleCostState;
+
+  /// Running quantity of the current sale, or `null` when no sale is active.
   ValueState<double?> get saleQuantityState;
+
+  /// Current fuel delivery speed.
   ValueState<Delivery> get deliveryState;
+
+  /// Fires with the completed [Sale] when fueling finishes.
   EventStream<Sale> get saleCompleteStream;
+
+  /// Fires when the pump should emit a beep sound.
   EventStream<Unit> get beepStream;
 
+  /// Sets or clears the active pump logic algorithm.
   void setPumpLogic(Pump? pump);
+
+  /// Updates the price setting for fuel type [number] (1-based).
   void setPriceSetting(int number, double price);
+
+  /// Toggles the nozzle identified by [number] (1-based) between up and down.
   void toggleNozzle(int number);
+
+  /// Sends a keypad key press into the reactive graph.
   void pressKey(NumericKey key);
+
+  /// Signals the POS terminal to clear the completed sale.
   void clearSale();
+
+  /// Releases all resources held by this bloc.
   void dispose();
 }
 
 /// Default implementation of [PetrolPumpBloc].
+///
+/// Wires up all reactive inputs, simulators, and outputs in a single
+/// transaction during construction. The pump logic can be swapped at
+/// runtime; all output states are derived via [switchMapState] so they
+/// automatically track the active logic.
 class PetrolPumpBlocImpl implements PetrolPumpBloc {
   late final ValueStateSink<Pump?> _pumpLogicStateSink;
   late final EventStreamSink<int> _toggleNozzleStreamSink;
@@ -52,6 +95,10 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
 
   late PumpEngineSimulator _pumpEngineSimulator;
 
+  /// Creates the bloc and wires up the entire reactive graph.
+  ///
+  /// All sinks, links, nozzle states, and output switchMaps are
+  /// constructed within a single transaction to ensure atomic setup.
   PetrolPumpBlocImpl() {
     runTransaction(() {
       _pumpLogicStateSink = ValueStateSink<Pump?>(null);
@@ -72,6 +119,9 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
           .toList();
 
       // Create 3 nozzle toggle states with cyclic feedback.
+      // Each nozzle uses a ValueStateLink for forward-declaration: the
+      // toggle stream snapshots the nozzle's own current value to flip it,
+      // creating a self-referential cycle that the link resolves.
       _nozzleStates = List.generate(3, (i) {
         final number = i + 1;
         final nozzleStateRef = ValueStateLink<UpDown>();
@@ -117,6 +167,9 @@ class PetrolPumpBlocImpl implements PetrolPumpBloc {
       });
 
       // Switch each output field through the dynamic pump logic.
+      // switchMapState/switchMapStream re-subscribes to the inner state
+      // whenever the pump logic changes, so swapping algorithms at runtime
+      // seamlessly redirects all output bindings.
       final outputs = Outputs(
         deliveryState: outputsState
             .switchMapState((outputs) => outputs.deliveryState)

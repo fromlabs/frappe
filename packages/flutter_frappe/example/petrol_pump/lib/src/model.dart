@@ -26,15 +26,34 @@ enum UpDown { up, down }
 
 /// Reactive inputs to the pump logic.
 class Inputs {
+  /// Nozzle 1 up/down position changes.
   final EventStream<UpDown> nozzle1Stream;
+
+  /// Nozzle 2 up/down position changes.
   final EventStream<UpDown> nozzle2Stream;
+
+  /// Nozzle 3 up/down position changes.
   final EventStream<UpDown> nozzle3Stream;
+
+  /// Key presses from the numeric keypad.
   final EventStream<NumericKey> keypadStream;
+
+  /// Fuel pulses from the pump engine (each event carries a pulse count).
   final EventStream<int> fuelPulsesStream;
+
+  /// Calibration factor converting pulses to fuel quantity.
   final ValueState<double> calibrationState;
+
+  /// Current price per unit for fuel type 1.
   final ValueState<double> price1State;
+
+  /// Current price per unit for fuel type 2.
   final ValueState<double> price2State;
+
+  /// Current price per unit for fuel type 3.
   final ValueState<double> price3State;
+
+  /// Signal from the POS terminal to clear the completed sale.
   final EventStream<Unit> clearSaleStream;
 
   Inputs({
@@ -51,6 +70,10 @@ class Inputs {
   });
 
   /// Creates inputs with default (inert) streams and states.
+  ///
+  /// Any parameter left null is replaced with a never-firing stream or a
+  /// zero-valued constant state. Useful for partial overrides in tests or
+  /// when only a subset of inputs is relevant.
   factory Inputs.defaults({
     EventStream<UpDown>? nozzle1Stream,
     EventStream<UpDown>? nozzle2Stream,
@@ -80,14 +103,31 @@ class Inputs {
 
 /// Reactive outputs from the pump logic.
 class Outputs {
+  /// Current fuel delivery speed.
   final ValueState<Delivery> deliveryState;
+
+  /// Text shown on the preset dollar amount LCD.
   final ValueState<String> presetLcdState;
+
+  /// Text shown on the sale cost LCD.
   final ValueState<String> saleCostLcdState;
+
+  /// Text shown on the sale quantity LCD.
   final ValueState<String> saleQuantityLcdState;
+
+  /// Text shown on the fuel type 1 price LCD.
   final ValueState<String> priceLcd1State;
+
+  /// Text shown on the fuel type 2 price LCD.
   final ValueState<String> priceLcd2State;
+
+  /// Text shown on the fuel type 3 price LCD.
   final ValueState<String> priceLcd3State;
+
+  /// Fires when the pump should emit a beep sound.
   final EventStream<Unit> beepStream;
+
+  /// Fires with the completed [Sale] when fueling finishes.
   final EventStream<Sale> saleCompleteStream;
 
   Outputs({
@@ -103,6 +143,10 @@ class Outputs {
   });
 
   /// Creates outputs with default (inert) values.
+  ///
+  /// Any parameter left null is replaced with an off/empty constant state
+  /// or a never-firing stream. Used as a fallback when no pump logic is
+  /// selected.
   factory Outputs.defaults({
     ValueState<Delivery>? deliveryState,
     ValueState<String>? presetLcdState,
@@ -130,9 +174,16 @@ class Outputs {
 
 /// A completed fuel sale.
 class Sale {
+  /// The type of fuel dispensed.
   final Fuel fuel;
+
+  /// The per-unit price at which fuel was sold.
   final double price;
+
+  /// The quantity of fuel dispensed (in liters).
   final double quantity;
+
+  /// The total cost of the sale (price * quantity).
   final double cost;
 
   const Sale({

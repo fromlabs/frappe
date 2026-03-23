@@ -5,7 +5,10 @@ import '../model.dart';
 
 /// Manages preset dollar amount and controls delivery speed.
 class Preset {
+  /// The current delivery mode: which fuel at what speed, or off.
   final ValueState<Delivery> deliveryState;
+
+  /// Whether the keypad is accepting input (disabled during slow delivery).
   final ValueState<bool> isKeypadActiveState;
 
   factory Preset({
@@ -20,6 +23,9 @@ class Preset {
         if (dollarsDelivered >= presetDollars) {
           return _Speed.stopped;
         }
+        // Switch to slow when within 0.1 liters of the preset target.
+        // Converts preset dollars to liters (presetDollars / price) and
+        // subtracts a small margin so the pump slows before overshooting.
         final slowLitersThreshold = presetDollars / price - 0.1;
         return litersDelivered < slowLitersThreshold
             ? _Speed.fast
@@ -55,4 +61,13 @@ class Preset {
   });
 }
 
-enum _Speed { fast, slow, stopped }
+enum _Speed {
+  /// Full delivery rate — the default when no preset or far from target.
+  fast,
+
+  /// Reduced rate — activated when nearing the preset dollar amount.
+  slow,
+
+  /// Delivery halted — the preset dollar amount has been reached.
+  stopped,
+}
