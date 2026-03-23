@@ -5,7 +5,7 @@ import '../../domain/models.dart';
 import '../../domain/port/pump.dart';
 import '../../domain/port/pump_engine.dart';
 import '../../infrastructure/pump_engine_simulator.dart';
-import '../petrol_pump_brew.dart';
+import '../petrol_pump.dart';
 
 /// Converts an LCD display string to a nullable double.
 ///

@@ -36,7 +36,7 @@ export 'src/application/pump/preset_amount_pump.dart';
 export 'src/application/pump/show_dollars_pump.dart';
 
 // Application — brew orchestrator.
-export 'src/application/petrol_pump_brew.dart';
+export 'src/application/petrol_pump.dart';
 export 'src/application/impl/default_petrol_pump_brew.dart';
 
 // Infrastructure.
