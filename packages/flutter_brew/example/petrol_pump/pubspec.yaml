@@ -1,0 +1,17 @@
+name: petrol_pump_brew
+description: Petrol Pump FRP example — Brew edition with hexagonal architecture.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  brew:
+  frappe:
+
+resolution: workspace
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

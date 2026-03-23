@@ -11,3 +11,5 @@ workspace:
   - packages/flutter_brew
   - packages/flutter_frappe/example/petrol_pump
   - packages/flutter_frappe/example/flutter_petrol_pump
+  - packages/flutter_brew/example/petrol_pump
+  - packages/flutter_brew/example/flutter_petrol_pump

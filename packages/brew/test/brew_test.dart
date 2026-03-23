@@ -2,7 +2,7 @@ import 'package:brew/brew.dart';
 import 'package:frappe/frappe.dart';
 import 'package:test/test.dart';
 
-class CounterBrew extends Brew {
+class CounterBrew extends BaseBrew {
   late final ValueStateSink<int> _countSink;
   late final ValueState<int> count;
 
