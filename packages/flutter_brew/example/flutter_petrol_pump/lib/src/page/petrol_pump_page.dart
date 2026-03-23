@@ -33,8 +33,11 @@ class _PetrolPumpPageState extends State<PetrolPumpPage> {
   ListenSubscription? _listenCanceler;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Only initialize once; inherited widget lookup is not available in initState.
+    if (_listenCanceler != null) return;
 
     final brew = _lookupBrew(context);
 
@@ -245,11 +248,14 @@ class PumpSettingsDialog extends StatefulWidget {
 }
 
 class _PumpSettingsDialogState extends State<PumpSettingsDialog> {
-  late List<TextEditingController> _priceControllers;
+  List<TextEditingController>? _priceControllers;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Only initialize once; inherited widget lookup is not available in initState.
+    if (_priceControllers != null) return;
 
     final brew = BrewProvider.of<PetrolPumpBrew>(context);
 
@@ -277,7 +283,7 @@ class _PumpSettingsDialogState extends State<PumpSettingsDialog> {
               ),
               Expanded(
                 child: TextField(
-                    controller: _priceControllers[number - 1],
+                    controller: _priceControllers![number - 1],
                     onChanged: (price) => brew.setPriceSetting(
                         number, double.parse(price)),
                     keyboardType: const TextInputType.numberWithOptions(

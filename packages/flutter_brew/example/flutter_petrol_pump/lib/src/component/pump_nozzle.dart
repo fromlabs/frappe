@@ -23,12 +23,11 @@ class _PumpNozzleState extends State<PumpNozzle>
   late Animation<double> _animation;
   late AnimationController _animationController;
   late ListenSubscription _listenCanceler;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-
-    final brew = BrewProvider.of<PetrolPumpBrew>(context);
 
     _animationController = AnimationController(
         duration: const Duration(milliseconds: 100), vsync: this);
@@ -38,6 +37,17 @@ class _PumpNozzleState extends State<PumpNozzle>
           ..addListener(() {
             setState(() {});
           });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Only subscribe once; inherited widget lookup is not available in initState.
+    if (_initialized) return;
+    _initialized = true;
+
+    final brew = BrewProvider.of<PetrolPumpBrew>(context);
 
     // Animate the nozzle up/down based on its toggle state.
     _listenCanceler =
